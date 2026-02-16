@@ -660,7 +660,6 @@ style='display: none'
         $output .= date('d-m-Y H:i:s') . "\n";
         $printer = new PrinterService();
         $printer->sendToKitchen($output);
-        $printer->sendToDesk($output);
 
 
         $resolved_orders = $new_resolved_orders->map(function ($item) {
