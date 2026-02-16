@@ -62,6 +62,26 @@ class OrderController extends Controller
 
         return view('admin.order', compact('orders', 'title', 'orderStatus', 'setting', 'orderTypeFilter'));
     }
+
+    public function getPendingOrderCount()
+    {
+        $pendingOrdersQuery = Order::with('user', 'orderAddress')
+            ->where('order_status', 0)
+            ->orderBy('id', 'desc');
+
+        $pendingCount = (clone $pendingOrdersQuery)->count();
+        $latestOrder = (clone $pendingOrdersQuery)->first();
+
+        return response()->json([
+            'pending_count' => $pendingCount,
+            'latest_order' => $latestOrder ? [
+                'id' => $latestOrder->id,
+                'order_id' => $latestOrder->order_id,
+                'customer_name' => optional($latestOrder->orderAddress)->name ?: optional($latestOrder->user)->name ?: 'Guest',
+                'created_at_human' => optional($latestOrder->created_at)->diffForHumans(),
+            ] : null,
+        ]);
+    }
     
     
 
@@ -449,8 +469,14 @@ class OrderController extends Controller
     {
         $order = Order::with('orderProducts', 'orderAddress')->find($id);
         $orderProducts = $order->orderProducts;
-        $orderAddress = $order->orderAddress->address;
-        $customerDetails = $order->orderAddress->name . ", \n" . $order->orderAddress->phone . ", \n" . $orderAddress;
+
+        $addr = $order->orderAddress;
+        if ($addr) {
+            $customerDetails = $addr->name . ", \n" . $addr->phone . ", \n" . $addr->address;
+        } else {
+            $customerDetails = 'Walk-in / POS';
+        }
+
         // Initialize an empty array to hold the formatted items
         $formattedItems = [];
 
@@ -461,7 +487,7 @@ class OrderController extends Controller
             $formattedItem->name = $product->product_name;
             $formattedItem->quantity = $product->qty;
             $formattedItem->price = $product->unit_price * $product->qty;
-            $formattedItem->category = $product->category_name;
+            $formattedItem->category = $product->category_name ?? '';
             // Add the formatted item to the array
             $formattedItems[] = $formattedItem;
         }
@@ -475,12 +501,18 @@ class OrderController extends Controller
 
         // Return the result as an object
         return (object)[
-            'id' => $id,
-            'items' => $formattedItems,
-            'discount' => $order['coupon_price'],
-            'delivery' => $order['delivery_charge'],
-            'total' => $order['grand_total'],
-            'customerDetails' => $customerDetails
+            'id'             => $order->order_id ?? $id,
+            'items'          => $formattedItems,
+            'discount'       => $order->coupon_price,
+            'delivery'       => $order->delivery_charge,
+            'total'          => $order->grand_total,
+            'customerDetails'=> $customerDetails,
+            'type'           => $order->order_type,
+            'coupon_name'    => $order->coupon_name,
+            'inst'           => $order->special_note ?? null,
+            'payment_method' => $order->payment_method,
+            'status'         => null,
+            'tableNumber'    => $order->table_no ?? null,
         ];
     }
 

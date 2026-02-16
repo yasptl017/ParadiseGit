@@ -15,6 +15,8 @@
     $unviewedReservationCount = $hasReservationViewedColumn
         ? (clone $relevantReservationQuery)->whereNull('admin_viewed_at')->count()
         : $relevantReservationCount;
+    $pendingWebOrderCount = App\Models\Order::where('order_status', 0)->count();
+    $latestPendingWebOrderId = (int) (App\Models\Order::where('order_status', 0)->max('id') ?? 0);
 @endphp
 
 @include('admin.header')
@@ -377,7 +379,10 @@
           var notificationUrl = "{{ route('admin.reservation-notifications') }}";
           var popupDataUrl = "{{ route('admin.reservation-popup-data') }}";
           var markViewedUrl = "{{ route('admin.reservation-mark-viewed') }}";
+          var pendingOrderUrl = "{{ url('admin/pending-order-count') }}";
           var previousUnviewed = {{ (int) $unviewedReservationCount }};
+          var previousPendingOrders = {{ (int) $pendingWebOrderCount }};
+          var previousPendingOrderId = {{ $latestPendingWebOrderId }};
           var audioContext = null;
           var hasInteracted = false;
 
@@ -428,6 +433,44 @@
               osc.stop(now + 0.4);
           }
 
+          function playWebOrderBeep() {
+              if (!hasInteracted) {
+                  return;
+              }
+              var ctx = getAudioContext();
+              if (!ctx) {
+                  return;
+              }
+              if (ctx.state === 'suspended') {
+                  ctx.resume();
+              }
+
+              var now = ctx.currentTime;
+              var osc1 = ctx.createOscillator();
+              var gain1 = ctx.createGain();
+              osc1.type = 'triangle';
+              osc1.frequency.setValueAtTime(700, now);
+              gain1.gain.setValueAtTime(0.0001, now);
+              gain1.gain.exponentialRampToValueAtTime(0.18, now + 0.03);
+              gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+              osc1.connect(gain1);
+              gain1.connect(ctx.destination);
+              osc1.start(now);
+              osc1.stop(now + 0.24);
+
+              var osc2 = ctx.createOscillator();
+              var gain2 = ctx.createGain();
+              osc2.type = 'triangle';
+              osc2.frequency.setValueAtTime(920, now + 0.17);
+              gain2.gain.setValueAtTime(0.0001, now + 0.17);
+              gain2.gain.exponentialRampToValueAtTime(0.16, now + 0.21);
+              gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.39);
+              osc2.connect(gain2);
+              gain2.connect(ctx.destination);
+              osc2.start(now + 0.17);
+              osc2.stop(now + 0.4);
+          }
+
           function setBadge(count) {
               var $badge = $('#reservationCountBadge');
               if (count > 0) {
@@ -459,6 +502,31 @@
                       }
 
                       previousUnviewed = unviewed;
+                  }
+              });
+          }
+
+          function refreshPendingOrders() {
+              $.ajax({
+                  url: pendingOrderUrl,
+                  type: 'GET',
+                  cache: false,
+                  success: function(resp) {
+                      var pending = parseInt(resp.pending_count || 0, 10);
+                      var latestOrder = resp.latest_order || null;
+                      var latestOrderId = parseInt((latestOrder && latestOrder.id) ? latestOrder.id : 0, 10);
+                      var hasNewOrder = pending > previousPendingOrders || (latestOrderId > previousPendingOrderId);
+
+                      if (hasNewOrder) {
+                          var message = latestOrder
+                              ? 'New web order #' + (latestOrder.order_id || latestOrder.id) + ' from ' + (latestOrder.customer_name || 'Guest')
+                              : 'New web order received.';
+                          toastr.success(message);
+                          playWebOrderBeep();
+                      }
+
+                      previousPendingOrders = pending;
+                      previousPendingOrderId = latestOrderId;
                   }
               });
           }
@@ -576,7 +644,10 @@
 
               updateFullscreenIcon();
 
-              setInterval(refreshNotifications, 15000);
+              setInterval(function() {
+                  refreshNotifications();
+                  refreshPendingOrders();
+              }, 15000);
           });
       })(jQuery);
   </script>
