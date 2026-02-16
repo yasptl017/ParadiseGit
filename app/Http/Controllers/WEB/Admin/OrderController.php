@@ -38,12 +38,14 @@ class OrderController extends Controller
         $ordersQuery = $this->applyOrderTypeFilter($ordersQuery, $request->get('order_type'));
         $orders = $ordersQuery->paginate(50)->appends($request->query());
 
+        $failedOrderIds = $this->getFailedOrderIds($orders->pluck('id')->all());
+
         $title = trans('POS Orders');
         $setting = Setting::first();
         $orderStatus = 3;
         $orderTypeFilter = $request->get('order_type', '');
 
-        return view('admin.posorder', compact('orders', 'title', 'orderStatus', 'setting', 'orderTypeFilter'));
+        return view('admin.posorder', compact('orders', 'title', 'orderStatus', 'setting', 'orderTypeFilter', 'failedOrderIds'));
     }
 
     public function webOrder(Request $request)
@@ -55,12 +57,48 @@ class OrderController extends Controller
         $ordersQuery = $this->applyOrderTypeFilter($ordersQuery, $request->get('order_type'));
         $orders = $ordersQuery->paginate(50)->appends($request->query());
 
+        $failedOrderIds = $this->getFailedOrderIds($orders->pluck('id')->all());
+
         $title = trans('Web Orders');
         $setting = Setting::first();
         $orderStatus = 0;
         $orderTypeFilter = $request->get('order_type', '');
 
-        return view('admin.order', compact('orders', 'title', 'orderStatus', 'setting', 'orderTypeFilter'));
+        return view('admin.order', compact('orders', 'title', 'orderStatus', 'setting', 'orderTypeFilter', 'failedOrderIds'));
+    }
+
+    public function getFailedPrintCounts()
+    {
+        $stuckCutoff = now()->subMinutes(5);
+
+        // Web-order print jobs: explicitly failed OR stuck pending > 5 min
+        $webFailed = \App\Models\PrintJob::join('orders', 'print_jobs.order_id', '=', 'orders.id')
+            ->where('orders.order_status', 0)
+            ->where(function ($q) use ($stuckCutoff) {
+                $q->where('print_jobs.status', \App\Models\PrintJob::STATUS_FAILED)
+                  ->orWhere(function ($q2) use ($stuckCutoff) {
+                      $q2->where('print_jobs.status', \App\Models\PrintJob::STATUS_PENDING)
+                         ->where('print_jobs.created_at', '<', $stuckCutoff);
+                  });
+            })
+            ->count();
+
+        // POS-order print jobs: explicitly failed OR stuck pending > 5 min
+        $posFailed = \App\Models\PrintJob::join('orders', 'print_jobs.order_id', '=', 'orders.id')
+            ->where('orders.order_status', 3)
+            ->where(function ($q) use ($stuckCutoff) {
+                $q->where('print_jobs.status', \App\Models\PrintJob::STATUS_FAILED)
+                  ->orWhere(function ($q2) use ($stuckCutoff) {
+                      $q2->where('print_jobs.status', \App\Models\PrintJob::STATUS_PENDING)
+                         ->where('print_jobs.created_at', '<', $stuckCutoff);
+                  });
+            })
+            ->count();
+
+        return response()->json([
+            'web_failed'  => $webFailed,
+            'pos_failed'  => $posFailed,
+        ]);
     }
 
     public function getPendingOrderCount()
@@ -514,6 +552,28 @@ class OrderController extends Controller
             'status'         => null,
             'tableNumber'    => $order->table_no ?? null,
         ];
+    }
+
+    private function getFailedOrderIds(array $orderIds): array
+    {
+        if (empty($orderIds)) {
+            return [];
+        }
+
+        $stuckCutoff = now()->subMinutes(5);
+
+        return \App\Models\PrintJob::whereIn('order_id', $orderIds)
+            ->where(function ($q) use ($stuckCutoff) {
+                $q->where('status', \App\Models\PrintJob::STATUS_FAILED)
+                  ->orWhere(function ($q2) use ($stuckCutoff) {
+                      $q2->where('status', \App\Models\PrintJob::STATUS_PENDING)
+                         ->where('created_at', '<', $stuckCutoff);
+                  });
+            })
+            ->pluck('order_id')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function applyOrderTypeFilter($query, $orderType)

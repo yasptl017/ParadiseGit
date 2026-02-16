@@ -72,6 +72,26 @@
             </a>
           </li>
 
+          {{-- Web order failed prints badge --}}
+          <li class="nav-item nav-mobile-hide" id="webPrintFailNav" style="display:none !important;">
+            <a href="{{ route('admin.web-order') }}" class="nav-link nav-link-lg print-fail-trigger" title="Web Order Print Failures">
+                <span class="print-fail-icon-bg print-fail-web-bg">
+                    <i class="fas fa-print"></i>
+                </span>
+                <span class="badge badge-danger print-fail-badge" id="webPrintFailBadge">0</span>
+            </a>
+          </li>
+
+          {{-- POS order failed prints badge --}}
+          <li class="nav-item nav-mobile-hide" id="posPrintFailNav" style="display:none !important;">
+            <a href="{{ route('admin.all-order') }}" class="nav-link nav-link-lg print-fail-trigger" title="POS Order Print Failures">
+                <span class="print-fail-icon-bg print-fail-pos-bg">
+                    <i class="fas fa-print"></i>
+                </span>
+                <span class="badge badge-danger print-fail-badge" id="posPrintFailBadge">0</span>
+            </a>
+          </li>
+
           @php
               $header_admin=Auth::guard('admin')->user();
               $defaultProfile = App\Models\BannerImage::whereId('15')->first();
@@ -255,6 +275,64 @@
           right: 4px;
       }
 
+      /* Print failure badges */
+      .print-fail-trigger {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 10px !important;
+      }
+
+      .print-fail-icon-bg {
+          width: 38px;
+          height: 38px;
+          border-radius: 11px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid transparent;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      .print-fail-trigger:hover .print-fail-icon-bg {
+          transform: translateY(-1px);
+      }
+
+      .print-fail-web-bg {
+          color: #b91c1c;
+          background: linear-gradient(135deg, #fff1f2 0%, #ffd9d9 100%);
+          border-color: #fca5a5;
+          box-shadow: 0 6px 18px rgba(185, 28, 28, 0.22);
+      }
+
+      .print-fail-pos-bg {
+          color: #92400e;
+          background: linear-gradient(135deg, #fffbeb 0%, #fde68a 100%);
+          border-color: #fcd34d;
+          box-shadow: 0 6px 18px rgba(146, 64, 14, 0.22);
+      }
+
+      .print-fail-badge {
+          position: absolute;
+          top: 2px;
+          right: 2px;
+          font-size: 10px;
+          min-width: 18px;
+          height: 18px;
+          line-height: 18px;
+          padding: 0 4px;
+          border-radius: 999px;
+      }
+
+      @keyframes printFailBlink {
+          0%,100% { opacity: 1; }
+          50%      { opacity: 0.25; }
+      }
+
+      .print-fail-blinking .print-fail-icon-bg {
+          animation: printFailBlink 0.9s ease-in-out infinite;
+      }
+
       .reservation-modal-content {
           border: 1px solid #f4d9bb;
           border-radius: 14px;
@@ -380,9 +458,12 @@
           var popupDataUrl = "{{ route('admin.reservation-popup-data') }}";
           var markViewedUrl = "{{ route('admin.reservation-mark-viewed') }}";
           var pendingOrderUrl = "{{ url('admin/pending-order-count') }}";
+          var failedPrintUrl  = "{{ url('admin/failed-print-counts') }}";
           var previousUnviewed = {{ (int) $unviewedReservationCount }};
           var previousPendingOrders = {{ (int) $pendingWebOrderCount }};
           var previousPendingOrderId = {{ $latestPendingWebOrderId }};
+          var previousWebFailed = 0;
+          var previousPosFailed = 0;
           var audioContext = null;
           var hasInteracted = false;
 
@@ -531,6 +612,65 @@
               });
           }
 
+          function playPrintFailBeep() {
+              if (!hasInteracted) return;
+              var ctx = getAudioContext();
+              if (!ctx) return;
+              if (ctx.state === 'suspended') ctx.resume();
+              var now = ctx.currentTime;
+              [0, 0.18, 0.36].forEach(function(offset) {
+                  var osc = ctx.createOscillator();
+                  var gain = ctx.createGain();
+                  osc.type = 'sawtooth';
+                  osc.frequency.setValueAtTime(440, now + offset);
+                  gain.gain.setValueAtTime(0.0001, now + offset);
+                  gain.gain.exponentialRampToValueAtTime(0.12, now + offset + 0.04);
+                  gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.14);
+                  osc.connect(gain);
+                  gain.connect(ctx.destination);
+                  osc.start(now + offset);
+                  osc.stop(now + offset + 0.15);
+              });
+          }
+
+          function setFailBadge(navId, badgeId, count) {
+              var $nav   = $('#' + navId);
+              var $badge = $('#' + badgeId);
+              if (count > 0) {
+                  $badge.text(count > 99 ? '99+' : count);
+                  $nav.css('display', '').addClass('print-fail-blinking');
+              } else {
+                  $nav.css('display', 'none').removeClass('print-fail-blinking');
+              }
+          }
+
+          function refreshFailedPrints() {
+              $.ajax({
+                  url: failedPrintUrl,
+                  type: 'GET',
+                  cache: false,
+                  success: function(resp) {
+                      var webFailed = parseInt(resp.web_failed || 0, 10);
+                      var posFailed = parseInt(resp.pos_failed || 0, 10);
+
+                      if (webFailed > previousWebFailed) {
+                          toastr.error('Web order print failed (' + webFailed + ' job' + (webFailed !== 1 ? 's' : '') + ')');
+                          playPrintFailBeep();
+                      }
+                      if (posFailed > previousPosFailed) {
+                          toastr.error('POS order print failed (' + posFailed + ' job' + (posFailed !== 1 ? 's' : '') + ')');
+                          playPrintFailBeep();
+                      }
+
+                      setFailBadge('webPrintFailNav', 'webPrintFailBadge', webFailed);
+                      setFailBadge('posPrintFailNav', 'posPrintFailBadge', posFailed);
+
+                      previousWebFailed = webFailed;
+                      previousPosFailed = posFailed;
+                  }
+              });
+          }
+
           function loadPopupReservations() {
               $.ajax({
                   url: popupDataUrl,
@@ -644,9 +784,11 @@
 
               updateFullscreenIcon();
 
+              refreshFailedPrints();
               setInterval(function() {
                   refreshNotifications();
                   refreshPendingOrders();
+                  refreshFailedPrints();
               }, 15000);
           });
       })(jQuery);

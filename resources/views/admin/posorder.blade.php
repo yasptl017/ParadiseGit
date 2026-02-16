@@ -3,6 +3,18 @@
     <title>{{ $title }}</title>
 @endsection
 @section('admin-content')
+<style>
+    @keyframes printFailRowBlink {
+        0%,100% { background-color: #fff3cd; }
+        50%      { background-color: #f8d7da; }
+    }
+    tr.print-fail-row {
+        animation: printFailRowBlink 1.2s ease-in-out infinite;
+    }
+    tr.print-fail-row td {
+        border-left: 3px solid #dc3545 !important;
+    }
+</style>
     <!-- Main Content -->
 
 
@@ -57,7 +69,7 @@
                                         </thead>
                                         <tbody>
                                         @foreach ($orders as $index => $order)
-                                            <tr>
+                                            <tr data-order-id="{{ $order->id }}" class="{{ in_array($order->id, $failedOrderIds) ? 'print-fail-row' : '' }}">
                                                 <td>{{ $index + 1 }}</td>
                                                 <td>{{ optional($order->orderAddress)->name }}</td>
                                                 <td>{{ optional($order->orderAddress)->phone }}</td>
@@ -195,6 +207,7 @@
                 data: { _token: '{{ csrf_token() }}' },
                 success: function() {
                     toastr.success('Sent to printer successfully');
+                    $('tr[data-order-id="' + _receiptOrderId + '"]').removeClass('print-fail-row');
                 },
                 error: function() {
                     toastr.error('Failed to send to printer');

@@ -24,5 +24,9 @@ class Order extends Model
     {
         return $this->hasOne(OrderAddress::class);
     }
-    
+
+    public function printJobs()
+    {
+        return $this->hasMany(\App\Models\PrintJob::class, 'order_id');
+    }
 }

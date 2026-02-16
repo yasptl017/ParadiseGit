@@ -147,14 +147,25 @@ class PrinterService
             if ($response !== false) {
                 $data = json_decode($response, true);
                 if (!empty($data['success'])) {
-                    // Agent printed successfully — mark job as printed
                     $job->status     = PrintJob::STATUS_PRINTED;
                     $job->printed_at = now();
                     $job->save();
+                } else {
+                    // Agent responded but reported failure
+                    $job->status = PrintJob::STATUS_FAILED;
+                    $job->error  = $data['error'] ?? 'Agent reported failure';
+                    $job->save();
                 }
+            } else {
+                // Agent unreachable (not running or connection refused)
+                $job->status = PrintJob::STATUS_FAILED;
+                $job->error  = 'Print agent unreachable';
+                $job->save();
             }
         } catch (\Throwable $e) {
-            // Agent unreachable — job stays pending, poll mode will pick it up
+            $job->status = PrintJob::STATUS_FAILED;
+            $job->error  = $e->getMessage();
+            $job->save();
         }
     }
 

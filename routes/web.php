@@ -340,6 +340,7 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
         Route::get('all-order', [OrderController::class, 'index'])->name('all-order');
         Route::get('web-order', [OrderController::class, 'webOrder'])->name('web-order');
         Route::get('pending-order-count', [OrderController::class, 'getPendingOrderCount'])->name('admin.pendingOrderCount');
+        Route::get('failed-print-counts', [OrderController::class, 'getFailedPrintCounts'])->name('admin.failedPrintCounts');
         Route::get('pregress-order', [OrderController::class, 'pregressOrder'])->name('pregress-order');
         Route::get('delivered-order', [OrderController::class, 'deliveredOrder'])->name('delivered-order');
         Route::get('completed-order', [OrderController::class, 'completedOrder'])->name('completed-order');
