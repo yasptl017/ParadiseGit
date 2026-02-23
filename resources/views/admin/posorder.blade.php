@@ -119,7 +119,7 @@
                                                     <button type="button" class="btn btn-warning btn-sm"
                                                             onclick="printBothPrinters({{ $order->id }}, this)"
                                                             title="Print to Kitchen + Desk">
-                                                        <i class="fas fa-print"></i> Both
+                                                        <i class="fas fa-print"></i>
                                                     </button>
                                                     <a href="javascript:" data-toggle="modal"
                                                        data-target="#deleteModal" class="btn btn-danger btn-sm"
