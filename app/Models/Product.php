@@ -19,12 +19,15 @@ class Product extends Model
     public function getOfferAttribute()
     {
         $price = $this->price;
-        $offer_price = $this->offer_price ? $this->offer_price : 0;
-        $offer_amount = $price - $offer_price;
-        $percentage = ($offer_amount * 100) / $price;
-        $percentage = round($percentage);
 
-        return $this->offer_price ? $percentage : 0;
+        if (!$this->offer_price || !$price) {
+            return 0;
+        }
+
+        $offer_amount = $price - $this->offer_price;
+        $percentage   = round(($offer_amount * 100) / $price);
+
+        return $percentage;
     }
 
     public function getAverageRatingAttribute()
