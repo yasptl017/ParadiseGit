@@ -391,4 +391,51 @@
     });
 })();
 </script>
+
+<nav class="bottom-nav">
+    <a href="{{ route('home') }}" class="bottom-nav-item">
+        <i class="fas fa-utensils"></i>
+        <span>Menu</span>
+    </a>
+    <a href="{{ route('reserve-table') }}" class="bottom-nav-item">
+        <i class="far fa-calendar-alt"></i>
+        <span>Reservation</span>
+    </a>
+    <a href="{{ route('offers') }}" class="bottom-nav-item">
+        <i class="fas fa-percent"></i>
+        <span>Offers</span>
+    </a>
+</nav>
+
+<style>
+    .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #fff;
+        display: flex;
+        justify-content: space-around;
+        padding: 10px 0;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+    }
+    .bottom-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: #333;
+        text-decoration: none;
+    }
+    .bottom-nav-item i {
+        font-size: 24px;
+        margin-bottom: 5px;
+    }
+    .bottom-nav-item span {
+        font-size: 12px;
+    }
+    .suc-page {
+        padding-bottom: 80px;
+    }
+</style>
 @endsection

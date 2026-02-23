@@ -68,7 +68,10 @@ use Laravel\Socialite\Facades\Socialite;
 
 Route::group(['middleware' => ['demo', 'XSS']], function () {
     Route::group(['middleware' => ['maintainance', 'HtmlSpecialchars']], function () {
-        Route::get('/', [HomeController::class, 'index'])->name('home');
+        Route::get('/', function () {
+            return view('landing');
+        })->name('landing');
+        Route::get('/menu', [HomeController::class, 'index'])->name('home');
         Route::get('/reserve-table', [HomeController::class, 'reserve_table'])->name('reserve-table');
         Route::get('/offers', [HomeController::class, 'offers'])->name('offers');
         Route::get('/social', [HomeController::class, 'social'])->name('social');

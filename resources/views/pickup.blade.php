@@ -211,43 +211,311 @@
 </div>
         <div class="tf__payment_modal">
             <div class="modal fade" id="stripePaymentModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-body">
-                            <div class="tf__pay_modal_info">
-                            <form role="form" action="{{ route('stripe-payment') }}" method="POST" class="require-validation" data-cc-on-file="false" data-stripe-publishable-key="{{ $stripePaymentInfo->stripe_key }}" id="payment-form">
-                                    @csrf
-                                    <div class="row">
-                                        <div class="col-12">
-                                            <input type="text" class="input card-number" name="card_number" placeholder="{{__('user.Card number')}}" autocomplete="off">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <input type="text" class="input card-expiry-month" name="month" placeholder="{{__('user.Month')}}" autocomplete="off">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <input class="input card-expiry-year" name="year" type="text" placeholder="{{__('user.Year')}}" autocomplete="off">
-                                        </div>
-
-                                        <div class="col-12">
-                                            <input class="input card-cvc" name="cvc" type="text" placeholder="{{__('user.CVC')}}" autocomplete="off">
-                                        </div>
-
-                                        <div class='col-12 mt-3 error d-none'>
-                                            <div class='alert-danger alert '>{{__('user.Please provide your valid card information')}}</div>
-                                        </div>
-
-                                    </div>
-                                    <div class="tf__payment_btn_area">
-                                        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">{{__('user.Close')}}</button>
-                                        <button type="submit" class="btn btn-success" id="stripe-submit-btn">{{__('user.Submit')}}</button>
-                                    </div>
-                                </form>
+                <div class="modal-dialog modal-dialog-centered pay-modal-dialog">
+                    <div class="modal-content pay-modal-content">
+                        {{-- ── Header ── --}}
+                        <div class="pay-modal-header">
+                            <div class="pay-modal-logo">
+                                <i class="fas fa-lock"></i>
+                                <span>Secure Payment</span>
                             </div>
+                            <button type="button" class="pay-modal-close" data-bs-dismiss="modal">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        {{-- ── Order summary strip ── --}}
+                        <div class="pay-order-summary">
+                            <div class="pay-summary-row">
+                                <div class="pay-summary-badge">
+                                    <i class="fas fa-shopping-bag"></i>
+                                    Pickup
+                                </div>
+                                <div class="pay-summary-amounts">
+                                    <span class="pay-summary-label">Subtotal</span>
+                                    <span class="pay-summary-val">{{ $currency_icon }}{{ number_format($sub_total, 2) }}</span>
+                                </div>
+                                @if($coupon_price > 0)
+                                <div class="pay-summary-amounts pay-summary-discount">
+                                    <span class="pay-summary-label"><i class="fas fa-tag"></i> Discount</span>
+                                    <span class="pay-summary-val">− {{ $currency_icon }}{{ number_format($coupon_price, 2) }}</span>
+                                </div>
+                                @endif
+                                <div class="pay-summary-amounts pay-summary-total">
+                                    <span class="pay-summary-label">Total</span>
+                                    <span class="pay-summary-val pay-grand-total">{{ $currency_icon }}{{ number_format($sub_total - $coupon_price, 2) }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-body pay-modal-body">
+                            <form role="form" action="{{ route('stripe-payment') }}" method="POST" class="require-validation" data-cc-on-file="false" data-stripe-publishable-key="{{ $stripePaymentInfo->stripe_key }}" id="payment-form">
+                                @csrf
+
+                                {{-- Card number --}}
+                                <div class="pay-field-group">
+                                    <label class="pay-label">Card Number</label>
+                                    <div class="pay-input-wrap">
+                                        <i class="far fa-credit-card pay-input-icon"></i>
+                                        <input type="text" class="pay-input card-number" name="card_number"
+                                               placeholder="1234  5678  9012  3456" autocomplete="off" maxlength="19">
+                                        <span class="pay-card-icons">
+                                            <i class="fab fa-cc-visa"></i>
+                                            <i class="fab fa-cc-mastercard"></i>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {{-- Expiry + CVC --}}
+                                <div class="pay-fields-row">
+                                    <div class="pay-field-group pay-field-half">
+                                        <label class="pay-label">Month</label>
+                                        <div class="pay-input-wrap">
+                                            <i class="far fa-calendar pay-input-icon"></i>
+                                            <input type="text" class="pay-input card-expiry-month" name="month"
+                                                   placeholder="MM" autocomplete="off" maxlength="2">
+                                        </div>
+                                    </div>
+                                    <div class="pay-field-group pay-field-half">
+                                        <label class="pay-label">Year</label>
+                                        <div class="pay-input-wrap">
+                                            <i class="far fa-calendar-alt pay-input-icon"></i>
+                                            <input type="text" class="pay-input card-expiry-year" name="year"
+                                                   placeholder="YY" autocomplete="off" maxlength="4">
+                                        </div>
+                                    </div>
+                                    <div class="pay-field-group pay-field-half">
+                                        <label class="pay-label">CVV</label>
+                                        <div class="pay-input-wrap">
+                                            <i class="fas fa-lock pay-input-icon"></i>
+                                            <input type="text" class="pay-input card-cvc" name="cvc"
+                                                   placeholder="•••" autocomplete="off" maxlength="4">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="error d-none mt-2">
+                                    <div class="pay-error-msg">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                        {{__('user.Please provide your valid card information')}}
+                                    </div>
+                                </div>
+
+                                <div class="pay-action-row">
+                                    <button type="button" class="pay-btn-cancel" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="pay-btn-submit" id="stripe-submit-btn">
+                                        <i class="fas fa-lock"></i>
+                                        Pay {{ $currency_icon }}{{ number_format($sub_total - $coupon_price, 2) }}
+                                    </button>
+                                </div>
+
+                                <p class="pay-secure-note">
+                                    <i class="fas fa-shield-alt"></i>
+                                    Your payment is encrypted and secure
+                                </p>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <style>
+            .pay-modal-dialog { max-width: 420px; }
+            .pay-modal-content {
+                border: none;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            }
+            .pay-modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 18px 24px 14px;
+                background: #fff;
+                border-bottom: 1px solid #f0f0f0;
+            }
+            .pay-modal-logo {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 700;
+                font-size: 15px;
+                color: #1a1a1a;
+            }
+            .pay-modal-logo i { color: #ff7c08; font-size: 16px; }
+            .pay-modal-close {
+                background: #f5f5f5;
+                border: none;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #666;
+                cursor: pointer;
+                transition: all .2s;
+            }
+            .pay-modal-close:hover { background: #ffe0cc; color: #ff7c08; }
+
+            .pay-order-summary {
+                background: #1e1e1e;
+                padding: 16px 24px;
+                color: #fff;
+            }
+            .pay-summary-row { display: flex; flex-direction: column; gap: 7px; }
+            .pay-summary-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: #ff7c08;
+                border-radius: 20px;
+                padding: 3px 12px;
+                font-size: 12px;
+                font-weight: 600;
+                width: fit-content;
+                margin-bottom: 4px;
+                color: #fff;
+            }
+            .pay-summary-amounts {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 13px;
+            }
+            .pay-summary-label { color: #aaa; font-weight: 500; }
+            .pay-summary-val { font-weight: 600; color: #fff; }
+            .pay-summary-discount .pay-summary-label { color: #4caf50; }
+            .pay-summary-discount .pay-summary-val { color: #4caf50; }
+            .pay-summary-total {
+                border-top: 1px solid #333;
+                padding-top: 10px;
+                margin-top: 4px;
+                font-size: 15px;
+            }
+            .pay-grand-total { font-size: 22px; font-weight: 800; color: #ff7c08; }
+
+            .pay-modal-body { padding: 20px 24px 16px; background: #fff; }
+
+            .pay-field-group { margin-bottom: 14px; }
+            .pay-label {
+                display: block;
+                font-size: 11px;
+                font-weight: 700;
+                color: #888;
+                text-transform: uppercase;
+                letter-spacing: .5px;
+                margin-bottom: 6px;
+            }
+            .pay-input-wrap {
+                position: relative;
+                display: flex;
+                align-items: center;
+            }
+            .pay-input-icon {
+                position: absolute;
+                left: 12px;
+                color: #bbb;
+                font-size: 14px;
+                pointer-events: none;
+            }
+            .pay-input {
+                width: 100%;
+                border: 1.5px solid #e8e8e8;
+                border-radius: 10px;
+                padding: 11px 12px 11px 36px;
+                font-size: 14px;
+                color: #1a1a1a;
+                background: #fafafa;
+                transition: all .2s;
+                outline: none;
+            }
+            .pay-input:focus {
+                border-color: #ff7c08;
+                background: #fff;
+                box-shadow: 0 0 0 3px rgba(255,124,8,.1);
+            }
+            .pay-card-icons {
+                position: absolute;
+                right: 12px;
+                display: flex;
+                gap: 4px;
+                font-size: 20px;
+                color: #bbb;
+            }
+            .pay-fields-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 10px;
+            }
+            .pay-field-half {}
+
+            .pay-error-msg {
+                background: #fff3f3;
+                border: 1px solid #ffcdd2;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 13px;
+                color: #c62828;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .pay-action-row {
+                display: flex;
+                gap: 10px;
+                margin-top: 18px;
+            }
+            .pay-btn-cancel {
+                flex: 0 0 auto;
+                padding: 12px 18px;
+                border: 1.5px solid #e0e0e0;
+                border-radius: 10px;
+                background: #fff;
+                color: #666;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all .2s;
+            }
+            .pay-btn-cancel:hover { background: #f5f5f5; border-color: #ccc; }
+            .pay-btn-submit {
+                flex: 1;
+                padding: 12px 20px;
+                border: none;
+                border-radius: 10px;
+                background: linear-gradient(135deg, #ff7c08, #e06c00);
+                color: #fff;
+                font-size: 15px;
+                font-weight: 700;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                transition: all .2s;
+                box-shadow: 0 4px 15px rgba(255,124,8,.35);
+            }
+            .pay-btn-submit:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 6px 20px rgba(255,124,8,.45);
+            }
+            .pay-secure-note {
+                text-align: center;
+                font-size: 12px;
+                color: #aaa;
+                margin-top: 12px;
+                margin-bottom: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+            }
+            .pay-secure-note i { color: #4caf50; }
+        </style>
     </section>
         <!-- Bottom Navigation Bar -->
 <nav class="bottom-nav">
