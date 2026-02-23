@@ -436,6 +436,20 @@ class OrderController extends Controller
         }
     }
 
+    public function printBoth(Request $request, $id)
+    {
+        $orderDetails = $this->getOrderDetails($id);
+        try {
+            $receipt = $this->printerService->getFormattedReceipt($orderDetails);
+            Order::where('id', $id)->update(['print_receipt' => $receipt]);
+            $this->printerService->printToDesk($orderDetails);
+            $this->printerService->printToKitchen($orderDetails);
+            return response()->json(['message' => 'Sent to both printers']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function viewReceipt($id)
     {
         $order = Order::find($id);

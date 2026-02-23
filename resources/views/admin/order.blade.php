@@ -96,6 +96,11 @@
                                                                 title="View Receipt">
                                                             <i class="fas fa-receipt"></i>
                                                         </button>
+                                                        <button type="button" class="btn btn-warning btn-sm"
+                                                                onclick="printBothPrinters({{ $order->id }}, this)"
+                                                                title="Print to Kitchen + Desk">
+                                                            <i class="fas fa-print"></i> Both
+                                                        </button>
                                                         <a href="javascript:;" data-toggle="modal" data-target="#deleteModal" class="btn btn-danger btn-sm" onclick="deleteData({{ $order->id }})">
                                                             <i class="fa fa-trash" aria-hidden="true"></i>
                                                         </a>
@@ -190,6 +195,25 @@
                 },
                 error: function() {
                     toastr.error('Failed to send to printer');
+                }
+            });
+        }
+
+        function printBothPrinters(orderId, btn) {
+            var $btn = $(btn);
+            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+            $.ajax({
+                url: '{{ url("admin/order-print-both") }}/' + orderId,
+                type: 'POST',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function() {
+                    toastr.success('Sent to kitchen + desk printers');
+                    $('tr[data-order-id="' + orderId + '"]').removeClass('print-fail-row');
+                    $btn.prop('disabled', false).html('<i class="fas fa-print"></i> Both');
+                },
+                error: function() {
+                    toastr.error('Failed to send to printers');
+                    $btn.prop('disabled', false).html('<i class="fas fa-print"></i> Both');
                 }
             });
         }
