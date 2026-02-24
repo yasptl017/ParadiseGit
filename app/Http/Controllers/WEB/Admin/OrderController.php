@@ -179,53 +179,94 @@ class OrderController extends Controller
 
     public function updateOrderStatus(Request $request, $id)
     {
-        $rules = [
-            'order_status' => 'required',
-            'payment_status' => 'required',
-        ];
-        $this->validate($request, $rules);
+        $validated = $request->validate([
+            'order_status' => 'nullable|in:0,1,2,3,4',
+            'payment_status' => 'nullable|in:0,1',
+            'payment_method' => 'nullable|in:Card,Cash,Unpaid',
+        ]);
 
-        $order = Order::find($id);
-        if ($request->order_status == 0) {
-            $order->order_status = 0;
-            $order->save();
-        } else if ($request->order_status == 1) {
-            $order->order_status = 1;
-            $order->order_approval_date = date('Y-m-d');
-            $order->save();
-        } else if ($request->order_status == 2) {
-            $order->order_status = 2;
-            $order->order_delivered_date = date('Y-m-d');
-            $order->save();
-        } else if ($request->order_status == 3) {
-            $order->order_status = 3;
-            $order->order_completed_date = date('Y-m-d');
-            $order->save();
-        } else if ($request->order_status == 4) {
-            $order->order_status = 4;
-            $order->order_declined_date = date('Y-m-d');
-            $order->save();
+        if (empty($validated)) {
+            $notification = array('messege' => 'No update value was provided.', 'alert-type' => 'error');
+            return redirect()->back()->with($notification);
         }
 
-        if ($request->payment_status == 0) {
-            $order->payment_status = 0;
-            $order->save();
-        } elseif ($request->payment_status == 1) {
-            $order->payment_status = 1;
-            $order->payment_approval_date = date('Y-m-d');
-            $order->save();
+        $order = Order::findOrFail($id);
+
+        if ($request->filled('order_status')) {
+            if ($request->order_status == 0) {
+                $order->order_status = 0;
+            } else if ($request->order_status == 1) {
+                $order->order_status = 1;
+                $order->order_approval_date = date('Y-m-d');
+            } else if ($request->order_status == 2) {
+                $order->order_status = 2;
+                $order->order_delivered_date = date('Y-m-d');
+            } else if ($request->order_status == 3) {
+                $order->order_status = 3;
+                $order->order_completed_date = date('Y-m-d');
+            } else if ($request->order_status == 4) {
+                $order->order_status = 4;
+                $order->order_declined_date = date('Y-m-d');
+            }
         }
 
-        $notification = trans('admin_validation.Order Status Updated successfully');
+        if ($request->filled('payment_status')) {
+            if ((int) $request->payment_status === 0) {
+                $order->payment_status = 0;
+                $order->payment_approval_date = null;
+            } else if ((int) $request->payment_status === 1) {
+                $order->payment_status = 1;
+                $order->payment_approval_date = date('Y-m-d');
+            }
+        }
+
+        if ($request->filled('payment_method')) {
+            if ($request->payment_method === 'Card') {
+                $order->payment_method = 'Card';
+                $order->payment_status = 1;
+                $order->payment_approval_date = date('Y-m-d');
+                $order->cash_on_delivery = 0;
+            } elseif ($request->payment_method === 'Cash') {
+                $order->payment_method = 'Cash';
+                $order->payment_status = 1;
+                $order->payment_approval_date = date('Y-m-d');
+                $order->cash_on_delivery = 1;
+            } elseif ($request->payment_method === 'Unpaid') {
+                $order->payment_method = 'Unpaid - COD';
+                $order->payment_status = 0;
+                $order->payment_approval_date = null;
+                $order->cash_on_delivery = 1;
+            }
+        }
+
+        $order->save();
+
+        $notificationText = $request->filled('payment_method')
+            ? 'Payment status updated successfully'
+            : trans('admin_validation.Order Status Updated successfully');
+        $notification = $notificationText;
         $notification = array('messege' => $notification, 'alert-type' => 'success');
         return redirect()->back()->with($notification);
     }
 
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $order = Order::find($id);
-        
+        $configuredPassword = (string) config('app.order_delete_password', '');
+        $providedPassword = (string) $request->input('delete_password', '');
+
+        if ($configuredPassword === '') {
+            $notification = array('messege' => 'Order delete password is not configured.', 'alert-type' => 'error');
+            return redirect()->back()->with($notification);
+        }
+
+        if (!hash_equals($configuredPassword, $providedPassword)) {
+            $notification = array('messege' => 'Invalid delete password.', 'alert-type' => 'error');
+            return redirect()->back()->with($notification);
+        }
+
+        $order = Order::findOrFail($id);
+
         $order->delete();
         $orderProducts = OrderProduct::where('order_id', $id)->get();
         $orderAddress = OrderAddress::where('order_id', $id)->first();

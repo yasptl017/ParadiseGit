@@ -303,12 +303,43 @@
                                             <span class="badge badge-primary"><i class="fas fa-credit-card"></i> Card</span>
                                         @elseif ($order->payment_method === 'Cash')
                                             <span class="badge badge-success"><i class="fas fa-money-bill-wave"></i> Cash</span>
-                                        @elseif ($order->payment_method === 'Unpaid - COD')
+                                        @elseif ($order->payment_method === 'Unpaid - COD' || $order->payment_method === 'Unpaid')
                                             <span class="badge badge-danger"><i class="fas fa-clock"></i> Unpaid - COD</span>
                                         @else
                                             <span class="badge badge-secondary">{{ $order->payment_method ?: 'N/A' }}</span>
                                         @endif
                                     </div>
+                                </div>
+                                <div class="info-row">
+                                    <div class="info-key">Payment Status</div>
+                                    <div class="info-val">
+                                        @if ((int) $order->payment_status === 1)
+                                            <span class="badge badge-success">Paid</span>
+                                        @else
+                                            <span class="badge badge-danger">Unpaid</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    @php
+                                        $paymentMethodValue = 'Unpaid';
+                                        if ($order->payment_method === 'Card') {
+                                            $paymentMethodValue = 'Card';
+                                        } elseif ($order->payment_method === 'Cash') {
+                                            $paymentMethodValue = 'Cash';
+                                        }
+                                    @endphp
+                                    <form method="POST" action="{{ route('admin.update-order-status', $order->id) }}" class="d-flex flex-wrap align-items-center" style="gap: 8px;">
+                                        @csrf
+                                        @method('PUT')
+                                        <label for="payment_method" class="mb-0" style="font-size:12px; font-weight:700; color:#374151;">Update Payment Status</label>
+                                        <select name="payment_method" id="payment_method" class="form-control form-control-sm" style="max-width: 180px;">
+                                            <option value="Card" {{ $paymentMethodValue === 'Card' ? 'selected' : '' }}>Card</option>
+                                            <option value="Cash" {{ $paymentMethodValue === 'Cash' ? 'selected' : '' }}>Cash</option>
+                                            <option value="Unpaid" {{ $paymentMethodValue === 'Unpaid' ? 'selected' : '' }}>Unpaid</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">Update</button>
+                                    </form>
                                 </div>
                             </div>
                         </div>

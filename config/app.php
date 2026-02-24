@@ -217,5 +217,6 @@ return [
         'discount' => env('DEFAULTS_DISCOUNT', 0),
         'delivery' => env('DEFAULTS_DELIVERY', 0),
     ],
+    'order_delete_password' => env('ORDER_DELETE_PASSWORD', ''),
 
 ];

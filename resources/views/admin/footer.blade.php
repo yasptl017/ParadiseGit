@@ -13,6 +13,18 @@
         </div>
         <div class="modal-body">
           <p>{{__('admin.Are You sure delete this item ?')}}</p>
+          <div id="orderDeletePasswordWrap" style="display:none; margin-top: 12px;">
+              <label for="orderDeletePassword" style="font-weight:600; margin-bottom:6px;">Admin Password</label>
+              <input type="password"
+                     id="orderDeletePassword"
+                     name="delete_password"
+                     form="deleteForm"
+                     class="form-control"
+                     placeholder="Enter password to delete order"
+                     autocomplete="off"
+                     disabled>
+              <small class="text-muted d-block mt-1">Password is required only for order delete.</small>
+          </div>
         </div>
         <div class="modal-footer bg-whitesmoke br">
             <form id="deleteForm" action="" method="POST">
@@ -101,6 +113,49 @@
             </script>
         @endforeach
     @endif
+
+<script>
+    (function ($) {
+        "use strict";
+
+        function orderDeleteRequiresPassword(action) {
+            return (action || '').indexOf('/delete-order/') !== -1;
+        }
+
+        function syncDeletePasswordInput() {
+            var action = $('#deleteForm').attr('action') || '';
+            var requiresPassword = orderDeleteRequiresPassword(action);
+            var $wrap = $('#orderDeletePasswordWrap');
+            var $input = $('#orderDeletePassword');
+
+            if (requiresPassword) {
+                $wrap.show();
+                $input.prop('disabled', false).attr('required', 'required');
+            } else {
+                $wrap.hide();
+                $input.val('').prop('disabled', true).removeAttr('required');
+            }
+        }
+
+        $(document).on('show.bs.modal', '#deleteModal', function () {
+            syncDeletePasswordInput();
+        });
+
+        $(document).on('hidden.bs.modal', '#deleteModal', function () {
+            $('#orderDeletePassword').val('');
+        });
+
+        $(document).on('submit', '#deleteForm', function (e) {
+            syncDeletePasswordInput();
+            var $input = $('#orderDeletePassword');
+            if (!$input.prop('disabled') && !$input.val().trim()) {
+                e.preventDefault();
+                toastr.error('Password is required to delete this order.');
+                $input.focus();
+            }
+        });
+    })(jQuery);
+</script>
 
 
 
