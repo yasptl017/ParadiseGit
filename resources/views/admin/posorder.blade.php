@@ -170,7 +170,7 @@
                         <i class="fas fa-print mr-1"></i> Print to Printer
                     </button>
                     <button type="button" class="btn btn-primary" onclick="browserPrintReceipt()">
-                        <i class="fas fa-print mr-1"></i> Print (Browser)
+                        <i class="fas fa-print mr-1"></i> Print (Browser, No Auto Cut)
                     </button>
                 </div>
             </div>

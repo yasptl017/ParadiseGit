@@ -55,6 +55,11 @@ DEFAULT_CONFIG = {
     "agent_port":      5757,    # local TCP port for push mode
 }
 
+GENERIC_FEED_LINES = 3
+RECEIPT_FEED_LINES = 6
+ESC_POS_FEED_LINES_BEFORE_CUT = 5
+ESC_POS_FULL_CUT = b"\x1d\x56\x00"   # GS V 0
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def load_config():
@@ -85,16 +90,34 @@ def get_windows_printers():
     return []
 
 
-def print_raw_text(printer_name, text):
+def _build_raw_payload(text, feed_lines=GENERIC_FEED_LINES, cut=False):
+    """Build RAW payload for thermal printers (text + feed + optional cut)."""
+    safe_text = (text or "")
+    if safe_text and not safe_text.endswith("\n"):
+        safe_text += "\n"
+
+    payload = safe_text.encode("cp437", errors="replace")
+    payload += b"\n" * max(0, int(feed_lines))
+
+    if cut:
+        # Feed via ESC d to improve cutter alignment across models.
+        payload += b"\x1b\x64" + bytes([ESC_POS_FEED_LINES_BEFORE_CUT])
+        payload += ESC_POS_FULL_CUT
+
+    return payload
+
+
+def print_raw_text(printer_name, text, feed_lines=GENERIC_FEED_LINES, cut=False):
     if not printer_name:
         raise ValueError("Printer name is empty")
     if WIN32_AVAILABLE:
         try:
+            payload = _build_raw_payload(text, feed_lines=feed_lines, cut=cut)
             hPrinter = win32print.OpenPrinter(printer_name)
             try:
                 hJob = win32print.StartDocPrinter(hPrinter, 1, ("Print Job", None, "RAW"))
                 win32print.StartPagePrinter(hPrinter)
-                win32print.WritePrinter(hPrinter, text.encode("cp437", errors="replace"))
+                win32print.WritePrinter(hPrinter, payload)
                 win32print.EndPagePrinter(hPrinter)
                 win32print.EndDocPrinter(hPrinter)
             finally:
@@ -104,7 +127,11 @@ def print_raw_text(printer_name, text):
             raise RuntimeError(f"win32print error: {e}")
     else:
         tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
-        tmp.write(text)
+        safe_text = (text or "")
+        if safe_text and not safe_text.endswith("\n"):
+            safe_text += "\n"
+        safe_text += "\n" * max(0, int(feed_lines))
+        tmp.write(safe_text)
         tmp.close()
         try:
             subprocess.run(["notepad", "/p", tmp.name], timeout=10)
@@ -1060,10 +1087,10 @@ class PrintAgentApp:
                 f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 "------------------------------------------\n"
                 "  If you see this, printing works!\n"
-                "\n\n\n"
             )
             try:
-                print_raw_text(printer, text)
+                is_receipt = label.strip().lower() == "receipt"
+                self._print_to_local_printer(printer, text, is_receipt=is_receipt)
                 self.log(f"Test print sent to: {printer}")
                 messagebox.showinfo("Test Print", f"Test page sent to {label} printer!")
             except Exception as e:
@@ -1112,6 +1139,16 @@ class PrintAgentApp:
             self._push_port_lbl.grid_remove()
             self._push_port_spin.grid_remove()
 
+    def _print_to_local_printer(self, printer_name, content, is_receipt=False):
+        """Central print path for all jobs to keep behavior consistent."""
+        feed_lines = RECEIPT_FEED_LINES if is_receipt else GENERIC_FEED_LINES
+        print_raw_text(
+            printer_name,
+            content,
+            feed_lines=feed_lines,
+            cut=is_receipt,
+        )
+
     def _handle_push_job(self, job):
         """Called by PushRequestHandler when a push print job arrives."""
         receipt_p = self.cfg.get("receipt_printer", "")
@@ -1132,7 +1169,7 @@ class PrintAgentApp:
         success   = True
         error_msg = None
         try:
-            print_raw_text(local_printer, content + "\n\n\n")
+            self._print_to_local_printer(local_printer, content, is_receipt=(label == "Receipt"))
             self.log(f"[PUSH] Printed Order #{order_id} → {label} ({local_printer})")
             self.root.after(0, lambda: self.jobs_printed.set(self.jobs_printed.get() + 1))
         except Exception as e:
@@ -1202,7 +1239,7 @@ class PrintAgentApp:
             success   = True
             error_msg = None
             try:
-                print_raw_text(local_printer, content + "\n\n\n")
+                self._print_to_local_printer(local_printer, content, is_receipt=(label == "Receipt"))
                 self.log(f"Printed Order #{order_id} → {label} ({local_printer})")
                 self.root.after(0, lambda: self.jobs_printed.set(self.jobs_printed.get() + 1))
             except Exception as e:

@@ -1,4 +1,4 @@
-('F:\\Laravel\\PunjabiParadise\\print-agent\\build\\PunjabiParadisePrintAgent\\PYZ-00.pyz',
+('F:\\Laravel\\ParadiseGit\\print-agent\\build\\PunjabiParadisePrintAgent\\PYZ-00.pyz',
  [('PIL',
    'C:\\Users\\Yagnesh\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),

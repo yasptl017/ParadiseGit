@@ -466,7 +466,7 @@
                         <i class="fas fa-print mr-1"></i> Print to Printer
                     </button>
                     <button type="button" class="btn btn-primary" onclick="browserPrintReceipt()">
-                        <i class="fas fa-print mr-1"></i> Print (Browser)
+                        <i class="fas fa-print mr-1"></i> Print (Browser, No Auto Cut)
                     </button>
                     <a href="{{ route('admin.order-receipt-pdf', $order->id) }}" class="btn btn-danger">
                         <i class="fas fa-file-pdf mr-1"></i> Save PDF
