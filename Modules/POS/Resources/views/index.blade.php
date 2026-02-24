@@ -635,7 +635,7 @@ select {
                                     >
                                         @csrf
                                         <button type="submit"
-                                                class="btn btn-primary">Update Kitchen
+                                                class="btn btn-primary">Update Printers
                                         </button>
                                     </form>
                                     <button id="placeOrderBtn"

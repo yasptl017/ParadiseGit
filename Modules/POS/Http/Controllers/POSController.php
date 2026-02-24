@@ -625,7 +625,7 @@ style='display: none'
         }
         //check if all orders are already resolved
         if ($new_orders->count() == 0) {
-            $notification = trans('All orders are already sent to kitchen');
+            $notification = trans('All orders are already sent to printers');
             $notification = array('messege' => $notification, 'alert-type' => 'success');
             return redirect()->back()->with($notification);
         }
@@ -658,8 +658,8 @@ style='display: none'
         //append current time
         $output .= "\n";
         $output .= date('d-m-Y H:i:s') . "\n";
-        $printer = new PrinterService();
-        $printer->sendToKitchen($output);
+        $this->printerService->sendToKitchen($output);
+        $this->printerService->sendToDesk($output);
 
 
         $resolved_orders = $new_resolved_orders->map(function ($item) {
@@ -675,7 +675,7 @@ style='display: none'
         $active_table->resolved_order = $resolved_orders;
         $active_table->save();
 
-        $notification = trans('Order Sent to Kitchen');
+        $notification = trans('Order sent to both printers');
         $notification = array('messege' => $notification, 'alert-type' => 'success');
         return redirect()->route('admin.pos')->with($notification);
     }
