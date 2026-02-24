@@ -55,6 +55,7 @@ use App\Http\Controllers\WEB\User\AddressCotroller;
 use App\Http\Controllers\WEB\User\PaymentController;
 use App\Http\Controllers\WEB\User\PaypalController;
 use App\Http\Controllers\WEB\User\UserProfileController;
+use App\Models\WorkingHour;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -69,7 +70,24 @@ use Laravel\Socialite\Facades\Socialite;
 Route::group(['middleware' => ['demo', 'XSS']], function () {
     Route::group(['middleware' => ['maintainance', 'HtmlSpecialchars']], function () {
         Route::get('/', function () {
-            return view('landing');
+            $workingHours = WorkingHour::orderBy('sort_order')->get();
+
+            if ($workingHours->isEmpty()) {
+                $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                foreach ($days as $index => $day) {
+                    WorkingHour::create([
+                        'day' => $day,
+                        'start_time' => '09:00',
+                        'end_time' => '21:00',
+                        'is_closed' => 0,
+                        'sort_order' => $index + 1,
+                    ]);
+                }
+
+                $workingHours = WorkingHour::orderBy('sort_order')->get();
+            }
+
+            return view('landing', compact('workingHours'));
         })->name('landing');
         Route::get('/menu', [HomeController::class, 'index'])->name('home');
         Route::get('/reserve-table', [HomeController::class, 'reserve_table'])->name('reserve-table');

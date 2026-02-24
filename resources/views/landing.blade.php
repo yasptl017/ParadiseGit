@@ -1210,34 +1210,25 @@
             </div>
             <h2>Opening Hours</h2>
             <div class="hours-list">
-                <div class="hours-item">
-                    <span class="hours-day">Monday</span>
-                    <span class="hours-time">5:00 PM - 10:00 PM</span>
-                </div>
-                <div class="hours-item">
-                    <span class="hours-day">Tuesday</span>
-                    <span class="hours-time closed">CLOSED</span>
-                </div>
-                <div class="hours-item">
-                    <span class="hours-day">Wednesday</span>
-                    <span class="hours-time">5:00 PM - 10:00 PM</span>
-                </div>
-                <div class="hours-item">
-                    <span class="hours-day">Thursday</span>
-                    <span class="hours-time">5:00 PM - 10:00 PM</span>
-                </div>
-                <div class="hours-item">
-                    <span class="hours-day">Friday</span>
-                    <span class="hours-time">5:00 PM - 10:00 PM</span>
-                </div>
-                <div class="hours-item">
-                    <span class="hours-day">Saturday</span>
-                    <span class="hours-time">5:00 PM - 10:00 PM</span>
-                </div>
-                <div class="hours-item">
-                    <span class="hours-day">Sunday</span>
-                    <span class="hours-time">5:00 PM - 10:00 PM</span>
-                </div>
+                @forelse(($workingHours ?? collect()) as $workingHour)
+                    <div class="hours-item">
+                        <span class="hours-day">{{ $workingHour->day }}</span>
+                        @if ($workingHour->is_closed || empty($workingHour->start_time) || empty($workingHour->end_time))
+                            <span class="hours-time closed">CLOSED</span>
+                        @else
+                            @php
+                                $startTime = date('g:i A', strtotime($workingHour->start_time));
+                                $endTime = date('g:i A', strtotime($workingHour->end_time));
+                            @endphp
+                            <span class="hours-time">{{ $startTime }} - {{ $endTime }}</span>
+                        @endif
+                    </div>
+                @empty
+                    <div class="hours-item">
+                        <span class="hours-day">Monday</span>
+                        <span class="hours-time closed">CLOSED</span>
+                    </div>
+                @endforelse
             </div>
         </div>
     </div>
@@ -1331,7 +1322,7 @@
                     DoorDash
                 </div>
                 <div class="platform-rating">
-                    <span class="rating-number">4.3</span>
+                    <span class="rating-number">4.4</span>
                     <div class="rating-stars">
                         <i class="fas fa-star"></i>
                         <i class="fas fa-star"></i>
@@ -1348,7 +1339,7 @@
                     <img src="{{ asset('landing/images/uber.svg') }}" width="110px"/>
                 </div>
                 <div class="platform-rating">
-                    <span class="rating-number">4.6</span>
+                    <span class="rating-number">4.5</span>
                     <div class="rating-stars">
                         <i class="fas fa-star"></i>
                         <i class="fas fa-star"></i>
