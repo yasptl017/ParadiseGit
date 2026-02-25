@@ -286,6 +286,18 @@
             padding: 1.5rem;
         }
 
+        .hours-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #7a5812;
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.45;
+            white-space: pre-line;
+        }
+
         .hours-item {
             display: flex;
             justify-content: space-between;
@@ -1210,6 +1222,9 @@
             </div>
             <h2>Opening Hours</h2>
             <div class="hours-list">
+                @if (!empty(optional($setting)->working_hours_popup_warning))
+                    <div class="hours-warning">{{ optional($setting)->working_hours_popup_warning }}</div>
+                @endif
                 @forelse(($workingHours ?? collect()) as $workingHour)
                     <div class="hours-item">
                         <span class="hours-day">{{ $workingHour->day }}</span>

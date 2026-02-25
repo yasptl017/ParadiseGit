@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Category;
 use App\Models\PrintJob;
+use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Support\Str;
 
@@ -192,7 +194,9 @@ class PrinterService
         $output .= sprintf("%-4s %-30s %6s\n", "Qty", "Item", "Amount");
         $output .= str_repeat("-", 42) . "\n";
 
-        foreach ($order->items as $item) {
+        $sortedItems = $this->sortItemsByReceiptCategoryOrder($order->items ?? []);
+
+        foreach ($sortedItems as $item) {
             $subtotal += $item->price;
 
             if (empty($item->size) || strtolower($item->size) === 'regular') {
@@ -251,5 +255,89 @@ class PrinterService
     {
         $name = trim((string) $name);
         return $name !== '' ? $name : null;
+    }
+
+    protected function sortItemsByReceiptCategoryOrder($items): array
+    {
+        if (empty($items)) {
+            return [];
+        }
+
+        if ($items instanceof \Illuminate\Support\Collection) {
+            $items = $items->all();
+        } elseif ($items instanceof \Traversable) {
+            $items = iterator_to_array($items, false);
+        } elseif (!is_array($items)) {
+            $items = (array) $items;
+        }
+
+        if (empty($items)) {
+            return [];
+        }
+
+        $categorySortById = Category::orderBy('receipt_sort_order')
+            ->orderBy('id')
+            ->pluck('receipt_sort_order', 'id')
+            ->map(fn ($value) => (int) $value)
+            ->toArray();
+
+        $categorySortByName = Category::orderBy('receipt_sort_order')
+            ->orderBy('id')
+            ->pluck('receipt_sort_order', 'name')
+            ->mapWithKeys(function ($value, $name) {
+                return [mb_strtolower(trim((string) $name)) => (int) $value];
+            })
+            ->toArray();
+
+        $productIds = [];
+        foreach ($items as $item) {
+            if (isset($item->product_id) && (int) $item->product_id > 0) {
+                $productIds[] = (int) $item->product_id;
+            }
+        }
+        $productIds = array_values(array_unique($productIds));
+
+        $productCategoryMap = [];
+        if (!empty($productIds)) {
+            $productCategoryMap = Product::whereIn('id', $productIds)
+                ->pluck('category_id', 'id')
+                ->map(fn ($value) => (int) $value)
+                ->toArray();
+        }
+
+        $rows = [];
+        foreach ($items as $index => $item) {
+            $sortOrder = 9999;
+
+            if (isset($item->category_id) && (int) $item->category_id > 0) {
+                $categoryId = (int) $item->category_id;
+                $sortOrder = $categorySortById[$categoryId] ?? 9999;
+            } elseif (isset($item->category) && trim((string) $item->category) !== '') {
+                $nameKey = mb_strtolower(trim((string) $item->category));
+                $sortOrder = $categorySortByName[$nameKey] ?? 9999;
+            } elseif (isset($item->product_id) && (int) $item->product_id > 0) {
+                $productId = (int) $item->product_id;
+                $categoryId = $productCategoryMap[$productId] ?? 0;
+                if ($categoryId > 0) {
+                    $sortOrder = $categorySortById[$categoryId] ?? 9999;
+                }
+            }
+
+            $rows[] = [
+                'sort' => $sortOrder,
+                'index' => $index,
+                'item' => $item,
+            ];
+        }
+
+        usort($rows, function ($a, $b) {
+            if ($a['sort'] === $b['sort']) {
+                return $a['index'] <=> $b['index'];
+            }
+
+            return $a['sort'] <=> $b['sort'];
+        });
+
+        return array_values(array_map(fn ($row) => $row['item'], $rows));
     }
 }

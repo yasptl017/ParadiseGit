@@ -580,17 +580,11 @@ class OrderController extends Controller
             $formattedItem->name = $product->product_name;
             $formattedItem->quantity = $product->qty;
             $formattedItem->price = $product->unit_price * $product->qty;
+            $formattedItem->product_id = (int) $product->product_id;
             $formattedItem->category = $product->category_name ?? '';
             // Add the formatted item to the array
             $formattedItems[] = $formattedItem;
         }
-
-        // Sort items by receipt_sort_order of their category
-        $sortMap = \App\Models\Category::orderBy('receipt_sort_order')->orderBy('id')
-            ->pluck('receipt_sort_order', 'name')->toArray();
-        usort($formattedItems, function ($a, $b) use ($sortMap) {
-            return ($sortMap[$a->category] ?? 9999) <=> ($sortMap[$b->category] ?? 9999);
-        });
 
         // Return the result as an object
         return (object)[

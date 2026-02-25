@@ -19,6 +19,19 @@
                                 @csrf
                                 @method('PUT')
 
+                                <div class="form-group mb-4">
+                                    <label for="working_hours_popup_warning" class="font-weight-bold">
+                                        Popup Warning Message (shown on user side above working hours)
+                                    </label>
+                                    <textarea
+                                        id="working_hours_popup_warning"
+                                        name="working_hours_popup_warning"
+                                        class="form-control"
+                                        rows="3"
+                                        placeholder="Type warning message to display in opening-hours popup..."
+                                    >{{ old('working_hours_popup_warning', optional($setting)->working_hours_popup_warning) }}</textarea>
+                                </div>
+
                                 <div class="table-responsive">
                                     <table class="table table-bordered table-striped">
                                         <thead>

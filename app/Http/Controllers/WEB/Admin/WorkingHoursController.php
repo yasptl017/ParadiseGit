@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\WEB\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\WorkingHour;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,7 @@ class WorkingHoursController extends Controller
     public function index()
     {
         $workingHours = WorkingHour::orderBy('sort_order')->get();
+        $setting = Setting::first();
 
         // If no working hours exist, create default entries for all 7 days
         if ($workingHours->isEmpty()) {
@@ -32,7 +34,7 @@ class WorkingHoursController extends Controller
             $workingHours = WorkingHour::orderBy('sort_order')->get();
         }
 
-        return view('admin.working_hours', compact('workingHours'));
+        return view('admin.working_hours', compact('workingHours', 'setting'));
     }
 
     public function update(Request $request)
@@ -43,6 +45,7 @@ class WorkingHoursController extends Controller
             'start_times' => 'required|array',
             'end_times' => 'required|array',
             'is_closed' => 'array',
+            'working_hours_popup_warning' => 'nullable|string|max:1000',
         ];
 
         $customMessages = [
@@ -66,6 +69,12 @@ class WorkingHoursController extends Controller
                     'is_closed' => $isClosed,
                 ]);
             }
+        }
+
+        $setting = Setting::first();
+        if ($setting) {
+            $setting->working_hours_popup_warning = $request->input('working_hours_popup_warning');
+            $setting->save();
         }
 
         $notification = trans('admin_validation.Updated Successfully');

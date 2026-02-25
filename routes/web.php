@@ -56,6 +56,7 @@ use App\Http\Controllers\WEB\User\PaymentController;
 use App\Http\Controllers\WEB\User\PaypalController;
 use App\Http\Controllers\WEB\User\UserProfileController;
 use App\Models\WorkingHour;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -71,6 +72,7 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
     Route::group(['middleware' => ['maintainance', 'HtmlSpecialchars']], function () {
         Route::get('/', function () {
             $workingHours = WorkingHour::orderBy('sort_order')->get();
+            $setting = Setting::first();
 
             if ($workingHours->isEmpty()) {
                 $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -87,7 +89,7 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
                 $workingHours = WorkingHour::orderBy('sort_order')->get();
             }
 
-            return view('landing', compact('workingHours'));
+            return view('landing', compact('workingHours', 'setting'));
         })->name('landing');
         Route::get('/menu', [HomeController::class, 'index'])->name('home');
         Route::get('/reserve-table', [HomeController::class, 'reserve_table'])->name('reserve-table');
