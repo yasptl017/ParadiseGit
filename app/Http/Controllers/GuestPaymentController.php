@@ -280,7 +280,7 @@ class GuestPaymentController extends Controller
             $order->save();
         }
 
-        $fileName = 'receipt-' . $order->order_id . '.txt';
+        $fileName = 'receipt-' . $order->id . '.txt';
         return response($order->print_receipt)
             ->header('Content-Type', 'text/plain; charset=UTF-8')
             ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"');

@@ -289,6 +289,14 @@
                                 <h6 class="info-box-title">{{ __('admin.Order Information') }}</h6>
 
                                 <div class="info-row">
+                                    <div class="info-key">Order Number</div>
+                                    <div class="info-val">{{ $order->order_id ?: 'N/A' }}</div>
+                                </div>
+                                <div class="info-row">
+                                    <div class="info-key">Order ID</div>
+                                    <div class="info-val">{{ $order->id }}</div>
+                                </div>
+                                <div class="info-row">
                                     <div class="info-key">{{ __('admin.Date') }}</div>
                                     <div class="info-val">{{ optional($order->created_at)->format('d F, Y h:i:s A') }}</div>
                                 </div>

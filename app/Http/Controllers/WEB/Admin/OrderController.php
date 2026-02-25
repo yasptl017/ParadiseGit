@@ -513,7 +513,7 @@ class OrderController extends Controller
                 $order->print_receipt = $this->printerService->getFormattedReceipt($orderDetails);
                 $order->save();
             } catch (Exception $e) {
-                $order->print_receipt = 'Order #' . $order->order_id . "\n"
+                $order->print_receipt = 'Order #' . $order->id . "\n"
                     . 'Date: ' . optional($order->created_at)->format('d M Y h:i A') . "\n"
                     . 'Type: ' . ($order->order_type ?: 'N/A') . "\n"
                     . 'Payment: ' . ($order->payment_method ?: 'N/A') . "\n"
@@ -531,7 +531,7 @@ class OrderController extends Controller
             <html>
             <head>
                 <meta charset="utf-8">
-                <title>Receipt #' . e($order->order_id) . '</title>
+                <title>Receipt #' . e($order->id) . '</title>
                 <style>
                     body { font-family: "Courier New", monospace; font-size: 11px; margin: 12px; color: #111827; }
                     .receipt-wrap {
@@ -551,7 +551,7 @@ class OrderController extends Controller
         $pdf->setPaper('A4', 'portrait');
         $pdf->render();
 
-        $fileName = 'receipt-' . $order->order_id . '.pdf';
+        $fileName = 'receipt-' . $order->id . '.pdf';
 
         return response()->streamDownload(function () use ($pdf) {
             echo $pdf->output();
@@ -594,7 +594,7 @@ class OrderController extends Controller
 
         // Return the result as an object
         return (object)[
-            'id'             => $order->order_id ?? $id,
+            'id'             => $order->id ?? $id,
             'items'          => $formattedItems,
             'discount'       => $order->coupon_price,
             'delivery'       => $order->delivery_charge,

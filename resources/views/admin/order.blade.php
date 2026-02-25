@@ -56,7 +56,7 @@
                                                 <th width="5%">{{__('admin.SN')}}</th>
                                                 <th width="10%">{{__('admin.Customer')}}</th>
                                                 <th width="10%">{{__('admin.Phone')}}</th>
-                                                <th width="5%">{{__('admin.Order Id')}}</th>
+                                                <th width="5%">Order ID</th>
                                                 <th width="10%">{{__('admin.Date')}}</th>
                                                 <th width="7%">{{__('admin.Amount')}}</th>
                                                 <!--<th width="10%">{{__('admin.Order Status')}}</th>-->
@@ -70,7 +70,7 @@
                                                     <td>{{ $index + 1 }}</td>
                                                     <td>{{ optional($order->orderAddress)->name }}</td>
                                                     <td>{{ optional($order->orderAddress)->phone }}</td>
-                                                    <td>{{ $order->order_id }}</td>
+                                                    <td>{{ $order->id ?? '-' }}</td>
                                                     <td>{{ $order->created_at->format('d F, Y') }}</td>
                                                     <td>{{ $setting->currency_icon }}{{ number_format((float)$order->grand_total, 2) }}</td>
                                                     <!--<td>
