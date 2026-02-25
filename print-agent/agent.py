@@ -56,8 +56,7 @@ DEFAULT_CONFIG = {
 }
 
 GENERIC_FEED_LINES = 3
-RECEIPT_FEED_LINES = 6
-ESC_POS_FEED_LINES_BEFORE_CUT = 5
+ESC_POS_FEED_LINES_BEFORE_CUT = 1
 ESC_POS_FULL_CUT = b"\x1d\x56\x00"   # GS V 0
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1089,8 +1088,8 @@ class PrintAgentApp:
                 "  If you see this, printing works!\n"
             )
             try:
-                is_receipt = label.strip().lower() == "receipt"
-                self._print_to_local_printer(printer, text, is_receipt=is_receipt)
+                printer_role = label.strip().lower()
+                self._print_to_local_printer(printer, text, printer_role=printer_role)
                 self.log(f"Test print sent to: {printer}")
                 messagebox.showinfo("Test Print", f"Test page sent to {label} printer!")
             except Exception as e:
@@ -1139,14 +1138,17 @@ class PrintAgentApp:
             self._push_port_lbl.grid_remove()
             self._push_port_spin.grid_remove()
 
-    def _print_to_local_printer(self, printer_name, content, is_receipt=False):
+    def _print_to_local_printer(self, printer_name, content, printer_role="generic"):
         """Central print path for all jobs to keep behavior consistent."""
-        feed_lines = RECEIPT_FEED_LINES if is_receipt else GENERIC_FEED_LINES
+        role = (printer_role or "").strip().lower()
+        should_cut = role in ("receipt", "kitchen")
+        # For cut-capable roles, rely on ESC/POS cut-feed for consistent spacing.
+        feed_lines = 0 if should_cut else GENERIC_FEED_LINES
         print_raw_text(
             printer_name,
             content,
             feed_lines=feed_lines,
-            cut=is_receipt,
+            cut=should_cut,
         )
 
     def _handle_push_job(self, job):
@@ -1169,7 +1171,7 @@ class PrintAgentApp:
         success   = True
         error_msg = None
         try:
-            self._print_to_local_printer(local_printer, content, is_receipt=(label == "Receipt"))
+            self._print_to_local_printer(local_printer, content, printer_role=label)
             self.log(f"[PUSH] Printed Order #{order_id} → {label} ({local_printer})")
             self.root.after(0, lambda: self.jobs_printed.set(self.jobs_printed.get() + 1))
         except Exception as e:
@@ -1239,7 +1241,7 @@ class PrintAgentApp:
             success   = True
             error_msg = None
             try:
-                self._print_to_local_printer(local_printer, content, is_receipt=(label == "Receipt"))
+                self._print_to_local_printer(local_printer, content, printer_role=label)
                 self.log(f"Printed Order #{order_id} → {label} ({local_printer})")
                 self.root.after(0, lambda: self.jobs_printed.set(self.jobs_printed.get() + 1))
             except Exception as e:
