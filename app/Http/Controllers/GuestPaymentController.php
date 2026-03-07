@@ -378,6 +378,7 @@ class GuestPaymentController extends Controller
             'total' => $order->grand_total,
             'inst' => $instructions ?? '',
             'customerDetails' => implode("\n", $customerLines),
+            'order_date' => optional($order->created_at)->format('d/m/Y H:i'),
         ];
     }
 }

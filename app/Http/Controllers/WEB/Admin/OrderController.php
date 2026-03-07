@@ -600,6 +600,7 @@ class OrderController extends Controller
             'payment_method' => $order->payment_method,
             'status'         => null,
             'tableNumber'    => $order->table_no ?? null,
+            'order_date'     => optional($order->created_at)->format('d/m/Y H:i'),
         ];
     }
 

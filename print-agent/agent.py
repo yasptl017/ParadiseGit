@@ -5,6 +5,7 @@ Runs as a system tray application with a settings/log GUI.
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -45,19 +46,28 @@ POLL_INTERVAL = 1
 LOG_MAX_LINES = 200
 
 DEFAULT_CONFIG = {
-    "server_url":      "",
-    "api_key":         "",
-    "receipt_printer": "",
-    "kitchen_printer": "",
-    "autostart":       False,
-    "poll_interval":   1,
-    "push_mode":       False,   # True = listen for HTTP push from server
-    "agent_port":      5757,    # local TCP port for push mode
+    "server_url":         "",
+    "api_key":            "",
+    "receipt_printer":    "",
+    "kitchen_printer":    "",
+    "autostart":          False,
+    "poll_interval":      1,
+    "push_mode":          False,   # True = listen for HTTP push from server
+    "agent_port":         5757,    # local TCP port for push mode
+    "receipt_logo_path":  "",      # absolute path to logo image on this PC
 }
 
 GENERIC_FEED_LINES = 3
 ESC_POS_FEED_LINES_BEFORE_CUT = 1
 ESC_POS_FULL_CUT = b"\x1d\x56\x00"   # GS V 0
+
+# ─── ESC/POS Formatting Commands ─────────────────────────────────────────────
+ESC_INIT         = b"\x1b\x40"        # ESC @ — initialize printer
+ESC_CODEPAGE_437 = b"\x1b\x74\x00"   # ESC t 0 — PC437 code page
+ESC_ALIGN_LEFT   = b"\x1b\x61\x00"   # ESC a 0 — left align
+ESC_ALIGN_CENTER = b"\x1b\x61\x01"   # ESC a 1 — center align
+ESC_BOLD_ON      = b"\x1b\x45\x01"   # ESC E 1 — bold on
+ESC_BOLD_OFF     = b"\x1b\x45\x00"   # ESC E 0 — bold off
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -89,13 +99,145 @@ def get_windows_printers():
     return []
 
 
-def _build_raw_payload(text, feed_lines=GENERIC_FEED_LINES, cut=False):
-    """Build RAW payload for thermal printers (text + feed + optional cut)."""
-    safe_text = (text or "")
-    if safe_text and not safe_text.endswith("\n"):
-        safe_text += "\n"
+def _process_markers(text: str) -> bytes:
+    """
+    Convert a plain-text string containing [BOLD], [CENTER] marker tags
+    into a bytes payload with ESC/POS binary commands embedded.
 
-    payload = safe_text.encode("cp437", errors="replace")
+    Supported markers:
+        [CENTER]...[/CENTER]  — center-align line, revert to left after
+        [BOLD]...[/BOLD]      — bold on/off (inline within a line)
+
+    Text portions are encoded to CP437; ESC/POS bytes are concatenated
+    directly — no re-encoding of binary bytes can occur.
+    """
+    output = bytearray()
+    output += ESC_INIT
+    output += ESC_CODEPAGE_437
+
+    for line in text.split("\n"):
+        # Determine alignment
+        if "[CENTER]" in line:
+            line = re.sub(r'\[/?CENTER\]', '', line)
+            output += ESC_ALIGN_CENTER
+            reset_align = ESC_ALIGN_LEFT
+        else:
+            output += ESC_ALIGN_LEFT
+            reset_align = b""
+
+        # Build line body, handling inline [BOLD]...[/BOLD]
+        line_body = bytearray()
+        cursor = 0
+        for m in re.finditer(r'\[BOLD\](.*?)\[/BOLD\]', line, re.DOTALL):
+            before = line[cursor:m.start()]
+            if before:
+                line_body += before.encode("cp437", errors="replace")
+            line_body += ESC_BOLD_ON
+            line_body += m.group(1).encode("cp437", errors="replace")
+            line_body += ESC_BOLD_OFF
+            cursor = m.end()
+        remaining = line[cursor:]
+        if remaining:
+            line_body += remaining.encode("cp437", errors="replace")
+
+        output += line_body
+        if reset_align:
+            output += reset_align
+        output += b"\n"
+
+    return bytes(output)
+
+
+def _load_logo_as_escpos(logo_path: str, max_width_px: int = 384) -> bytes:
+    """
+    Load a logo image (JPEG/PNG/BMP), convert to 1-bit raster and return
+    ESC/POS GS v 0 raster image bytes ready to send to a thermal printer.
+
+    max_width_px: max printable width in pixels (384 = 48 mm at 203 dpi).
+    Returns b"" on any error so printing continues without logo.
+    """
+    if not logo_path or not os.path.isfile(logo_path):
+        return b""
+
+    try:
+        from PIL import Image
+    except ImportError:
+        return b""
+
+    try:
+        img = Image.open(logo_path).convert("RGBA")
+
+        # Flatten onto white background (handles PNG transparency)
+        background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        background.paste(img, mask=img.split()[3])
+        img = background.convert("RGB")
+
+        # Scale down to max_width_px preserving aspect ratio
+        orig_w, orig_h = img.size
+        if orig_w > max_width_px:
+            new_h = int(orig_h * max_width_px / orig_w)
+            img = img.resize((max_width_px, new_h), Image.LANCZOS)
+
+        # Convert to 1-bit bilevel with dithering
+        img = img.convert("1")
+        width_px, height_px = img.size
+
+        # Width must be a multiple of 8 for byte alignment
+        padded_width = ((width_px + 7) // 8) * 8
+        if padded_width != width_px:
+            padded_img = Image.new("1", (padded_width, height_px), 1)
+            padded_img.paste(img, (0, 0))
+            img = padded_img
+            width_px = padded_width
+
+        # Build raster data — Pillow "1" mode: 0 = black, non-zero = white
+        pixels = img.load()
+        row_bytes = width_px // 8
+        raster_data = bytearray()
+        for y in range(height_px):
+            for x_byte in range(row_bytes):
+                byte_val = 0
+                for bit in range(8):
+                    if pixels[x_byte * 8 + bit, y] == 0:   # black pixel
+                        byte_val |= (0x80 >> bit)
+                raster_data.append(byte_val)
+
+        # GS v 0 command: GS 'v' '0' m xL xH yL yH d1..dk
+        xL = row_bytes & 0xFF
+        xH = (row_bytes >> 8) & 0xFF
+        yL = height_px & 0xFF
+        yH = (height_px >> 8) & 0xFF
+
+        cmd = bytearray()
+        cmd += ESC_ALIGN_CENTER
+        cmd += b"\x1d\x76\x30\x00"       # GS v 0, m=0 (normal density)
+        cmd += bytes([xL, xH, yL, yH])
+        cmd += raster_data
+        cmd += ESC_ALIGN_LEFT
+        cmd += b"\n"
+
+        return bytes(cmd)
+
+    except Exception:
+        return b""   # silent fail — receipt text still prints
+
+
+def _build_raw_payload(text, feed_lines=GENERIC_FEED_LINES, cut=False, role="generic", logo_path=""):
+    """Build RAW payload for thermal printers (text + feed + optional cut).
+
+    For role='receipt': prepends logo (if configured) and processes ESC/POS
+    marker tags embedded in the text by PHP.
+    For all other roles: plain CP437 text, no marker processing.
+    """
+    if role == "receipt":
+        logo_bytes = _load_logo_as_escpos(logo_path) if logo_path else b""
+        payload = bytearray(logo_bytes) + bytearray(_process_markers(text or ""))
+    else:
+        safe_text = (text or "")
+        if safe_text and not safe_text.endswith("\n"):
+            safe_text += "\n"
+        payload = bytearray(safe_text.encode("cp437", errors="replace"))
+
     payload += b"\n" * max(0, int(feed_lines))
 
     if cut:
@@ -103,15 +245,15 @@ def _build_raw_payload(text, feed_lines=GENERIC_FEED_LINES, cut=False):
         payload += b"\x1b\x64" + bytes([ESC_POS_FEED_LINES_BEFORE_CUT])
         payload += ESC_POS_FULL_CUT
 
-    return payload
+    return bytes(payload)
 
 
-def print_raw_text(printer_name, text, feed_lines=GENERIC_FEED_LINES, cut=False):
+def print_raw_text(printer_name, text, feed_lines=GENERIC_FEED_LINES, cut=False, role="generic", logo_path=""):
     if not printer_name:
         raise ValueError("Printer name is empty")
     if WIN32_AVAILABLE:
         try:
-            payload = _build_raw_payload(text, feed_lines=feed_lines, cut=cut)
+            payload = _build_raw_payload(text, feed_lines=feed_lines, cut=cut, role=role, logo_path=logo_path)
             hPrinter = win32print.OpenPrinter(printer_name)
             try:
                 hJob = win32print.StartDocPrinter(hPrinter, 1, ("Print Job", None, "RAW"))
@@ -125,11 +267,12 @@ def print_raw_text(printer_name, text, feed_lines=GENERIC_FEED_LINES, cut=False)
         except Exception as e:
             raise RuntimeError(f"win32print error: {e}")
     else:
-        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
-        safe_text = (text or "")
+        # Notepad fallback: strip ESC/POS markers so raw tags don't appear in text
+        safe_text = re.sub(r'\[/?(BOLD|CENTER)\]', '', text or "")
         if safe_text and not safe_text.endswith("\n"):
             safe_text += "\n"
         safe_text += "\n" * max(0, int(feed_lines))
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
         tmp.write(safe_text)
         tmp.close()
         try:
@@ -756,6 +899,29 @@ class PrintAgentApp:
         self.sv_autostart = tk.BooleanVar(value=self.cfg.get("autostart", False))
         ttk.Checkbutton(wf, text="Start automatically with Windows",
                         variable=self.sv_autostart).pack(anchor=tk.W, padx=8, pady=4)
+
+        # ── Receipt Logo ────────────────────────────────────────────────
+        lf = ttk.LabelFrame(settings_frame, text="Receipt Logo")
+        lf.pack(fill=tk.X, padx=14, pady=4)
+        self.sv_logo_path = tk.StringVar(value=self.cfg.get("receipt_logo_path", ""))
+        ttk.Label(lf, text="Logo File:").grid(row=0, column=0, sticky=tk.W, padx=8, pady=4)
+        logo_entry = ttk.Entry(lf, textvariable=self.sv_logo_path, width=38)
+        logo_entry.grid(row=0, column=1, padx=4, pady=4, sticky=tk.EW)
+
+        def _browse_logo():
+            from tkinter import filedialog
+            path = filedialog.askopenfilename(
+                title="Select Logo Image",
+                filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp"), ("All files", "*.*")]
+            )
+            if path:
+                self.sv_logo_path.set(path)
+
+        ttk.Button(lf, text="Browse…", command=_browse_logo).grid(row=0, column=2, padx=4, pady=4)
+        ttk.Label(lf, text="Leave blank for no logo. Recommended: JPEG or PNG, max 384 px wide.",
+                  foreground="gray", font=("Segoe UI", 8)
+                  ).grid(row=1, column=0, columnspan=3, sticky=tk.W, padx=8, pady=(0, 4))
+
         ttk.Button(settings_frame, text="Save & Connect", command=self._save_settings).pack(pady=10)
 
         self._update_printer_labels()
@@ -1001,14 +1167,15 @@ class PrintAgentApp:
     # ── Settings ─────────────────────────────────────────────────────────
 
     def _save_settings(self):
-        self.cfg["server_url"]      = self.sv_url.get().rstrip("/")
-        self.cfg["api_key"]         = self.sv_key.get()
-        self.cfg["receipt_printer"] = self.sv_receipt_printer.get()
-        self.cfg["kitchen_printer"] = self.sv_kitchen_printer.get()
-        self.cfg["autostart"]       = self.sv_autostart.get()
-        self.cfg["poll_interval"]   = int(self.sv_poll.get())
-        self.cfg["push_mode"]       = self.sv_push_mode.get()
-        self.cfg["agent_port"]      = int(self.sv_agent_port.get())
+        self.cfg["server_url"]         = self.sv_url.get().rstrip("/")
+        self.cfg["api_key"]            = self.sv_key.get()
+        self.cfg["receipt_printer"]    = self.sv_receipt_printer.get()
+        self.cfg["kitchen_printer"]    = self.sv_kitchen_printer.get()
+        self.cfg["autostart"]          = self.sv_autostart.get()
+        self.cfg["poll_interval"]      = int(self.sv_poll.get())
+        self.cfg["push_mode"]          = self.sv_push_mode.get()
+        self.cfg["agent_port"]         = int(self.sv_agent_port.get())
+        self.cfg["receipt_logo_path"]  = self.sv_logo_path.get().strip()
         save_config(self.cfg)
         set_autostart(self.cfg["autostart"])
         self._update_printer_labels()
@@ -1144,11 +1311,14 @@ class PrintAgentApp:
         should_cut = role in ("receipt", "kitchen")
         # For cut-capable roles, rely on ESC/POS cut-feed for consistent spacing.
         feed_lines = 0 if should_cut else GENERIC_FEED_LINES
+        logo_path = self.cfg.get("receipt_logo_path", "") if role == "receipt" else ""
         print_raw_text(
             printer_name,
             content,
             feed_lines=feed_lines,
             cut=should_cut,
+            role=role,
+            logo_path=logo_path,
         )
 
     def _handle_push_job(self, job):

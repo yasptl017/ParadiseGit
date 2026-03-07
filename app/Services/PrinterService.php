@@ -37,7 +37,7 @@ class PrinterService
         $job = PrintJob::create([
             'order_id' => $order->id ?? null,
             'printer'  => $this->kitchenPrinter,
-            'content'  => is_string($order) ? $order : $this->formatOrderDetails($order),
+            'content'  => is_string($order) ? $order : $this->formatKitchenDetails($order),
             'status'   => PrintJob::STATUS_PENDING,
         ]);
 
@@ -79,7 +79,7 @@ class PrinterService
         $job = PrintJob::create([
             'order_id' => $order->id ?? null,
             'printer'  => $this->kitchenPrinter,
-            'content'  => $this->formatOrderDetails($order),
+            'content'  => $this->formatKitchenDetails($order),
             'status'   => PrintJob::STATUS_PENDING,
         ]);
 
@@ -171,23 +171,24 @@ class PrinterService
         }
     }
 
-    protected function formatOrderDetails($order)
+    protected function formatOrderDetails($order): string
     {
         $output   = "";
         $subtotal = 0;
-        $output .= "         Punjabi Paradise\n";
-        $output .= "     419 High Street, Penrith, 2750\n";
-        $output .= "Phone: 0247076700     ABN: 86673991529\n";
-        $output .= "Order Online at: www.punjabiparadise.com.au\n";
+
+        $output .= "[CENTER][BOLD]Punjabi Paradise[/BOLD][/CENTER]\n";
+        $output .= "[CENTER]419 High Street, Penrith, 2750[/CENTER]\n";
+        $output .= "[CENTER]Ph: 0247076700  ABN: 86673991529[/CENTER]\n";
+        $output .= "[CENTER]www.punjabiparadise.com.au[/CENTER]\n";
         $output .= str_repeat("-", 42) . "\n";
-        $output .= "Customer Details: " . $order->customerDetails . "\n";
+        $output .= "Customer: " . $order->customerDetails . "\n";
         if ($order->type === 'DineIn') {
             $output .= "Table: " . $order->tableNumber . "\n";
         }
         $output .= str_repeat("-", 42) . "\n";
-        $output .= "Order No: " . $order->id . "\n";
-        $output .= 'Order Type: ' . $order->type . "\n";
-        $output .= "Date: " . date('Y-m-d H:i:s') . "\n";
+        $output .= "[BOLD]Order No: " . $order->id . "[/BOLD]\n";
+        $output .= "Order Type: " . $order->type . "\n";
+        $output .= "Date: " . ($order->order_date ?? date('d/m/Y H:i')) . "\n";
         $output .= str_repeat("-", 42) . "\n";
         $output .= "Items:\n";
         $output .= str_repeat("-", 42) . "\n";
@@ -199,17 +200,13 @@ class PrinterService
         foreach ($sortedItems as $item) {
             $subtotal += $item->price;
 
-            if (empty($item->size) || strtolower($item->size) === 'regular') {
-                $name = $item->name;
-            } else {
-                $name = $item->name . '-' . $item->size;
-            }
+            $name = (empty($item->size) || strtolower($item->size) === 'regular')
+                ? $item->name
+                : $item->name . '-' . $item->size;
 
             if (strlen($name) > 30) {
-                $firstLine = substr($name, 0, 30);
-                $remaining = substr($name, 30);
-                $output .= sprintf("%-4s %-30s %6.2f\n", $item->quantity, $firstLine, $item->price);
-                $output .= sprintf("%-4s %-30s\n", "", $remaining);
+                $output .= sprintf("%-4s %-30s %6.2f\n", $item->quantity, substr($name, 0, 30), $item->price);
+                $output .= sprintf("%-4s %-30s\n", "", substr($name, 30));
             } else {
                 $output .= sprintf("%-4s %-30s %6.2f\n", $item->quantity, $name, $item->price);
             }
@@ -226,7 +223,7 @@ class PrinterService
         $output .= sprintf("%-30s %12s\n", $couponLabel, "$" . number_format($order->discount, 2));
         $output .= sprintf("%-30s %12s\n", "Delivery Charge:", "$" . number_format($order->delivery, 2));
         $output .= str_repeat("-", 42) . "\n";
-        $output .= sprintf("%-30s %12s\n", "Total:", "$" . number_format($order->total, 2));
+        $output .= "[BOLD]" . sprintf("%-30s %12s", "Total:", "$" . number_format($order->total, 2)) . "[/BOLD]\n";
         $output .= str_repeat("-", 42) . "\n";
 
         if (!empty($order->inst)) {
@@ -247,7 +244,48 @@ class PrinterService
             $output .= sprintf("%-1s %12s\n", "Status:", "*** PAID ***");
         }
 
-        $output .= "Thank you!\n";
+        $output .= "[BOLD]Thank you![/BOLD]\n";
+        return $output;
+    }
+
+    protected function formatKitchenDetails($order): string
+    {
+        $output  = "*** KITCHEN ORDER ***\n";
+        $output .= str_repeat("-", 42) . "\n";
+        $output .= "Order No:   " . $order->id . "\n";
+        $output .= "Order Type: " . $order->type . "\n";
+        $output .= "Date:       " . ($order->order_date ?? date('d/m/Y H:i')) . "\n";
+        $output .= str_repeat("-", 42) . "\n";
+        $output .= "Customer:   " . $order->customerDetails . "\n";
+        if ($order->type === 'DineIn') {
+            $output .= "Table:      " . $order->tableNumber . "\n";
+        }
+        $output .= str_repeat("-", 42) . "\n";
+        $output .= "Items:\n";
+        $output .= str_repeat("-", 42) . "\n";
+
+        $sortedItems = $this->sortItemsByReceiptCategoryOrder($order->items ?? []);
+        foreach ($sortedItems as $item) {
+            $name = (empty($item->size) || strtolower($item->size) === 'regular')
+                ? $item->name
+                : $item->name . '-' . $item->size;
+
+            if (strlen($name) > 36) {
+                $output .= sprintf("%-4s %-36s\n", $item->quantity, substr($name, 0, 36));
+                $output .= sprintf("%-4s %-36s\n", "", substr($name, 36));
+            } else {
+                $output .= sprintf("%-4s %-36s\n", $item->quantity, $name);
+            }
+        }
+
+        $output .= str_repeat("-", 42) . "\n";
+
+        if (!empty($order->inst)) {
+            $output .= "SPECIAL INSTRUCTIONS:\n";
+            $output .= wordwrap($order->inst, 42) . "\n";
+            $output .= str_repeat("-", 42) . "\n";
+        }
+
         return $output;
     }
 

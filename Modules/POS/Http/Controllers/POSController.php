@@ -568,6 +568,9 @@ style='display: none'
                 'payment_method' => $order['payment_method'] ?? 'Card',
                 'customerDetails' => $customerDetails,
                 'tableNumber' => $active_table->name,
+                'coupon_name' => $order['coupon_name'] ?? null,
+                'inst' => null,
+                'order_date' => optional(\App\Models\Order::find($orderId)->created_at)->format('d/m/Y H:i'),
             ];
 
         return $details;
