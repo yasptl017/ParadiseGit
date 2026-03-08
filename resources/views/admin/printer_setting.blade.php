@@ -177,7 +177,7 @@
                             <div class="input-group mb-3 printer-key-group">
                                 <input type="text" class="form-control font-monospace"
                                     id="apiKeyField"
-                                    value="{{ env('PRINT_AGENT_KEY') }}"
+                                    value="{{ config('app.print_agent_key') }}"
                                     readonly>
                                 <div class="input-group-append">
                                     <button class="btn btn-outline-secondary" type="button" onclick="copyKey()">Copy</button>
