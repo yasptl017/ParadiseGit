@@ -67,7 +67,7 @@
 
                 <li class="{{ Route::is('admin.product-category.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.product-category.index') }}">{{__('admin.Categories')}}</a></li>
 
-                <li class="{{ Route::is('admin.category-order') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.category-order') }}"><i class="fas fa-sort mr-1"></i>Category Order</a></li>
+                <li class="{{ Route::is('admin.category-order') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.category-order') }}">Category Order</a></li>
 
                 <li class="{{ Route::is('admin.reservation') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.reservation') }}">{{__('admin.Reservations')}}</a></li>
 
@@ -75,7 +75,7 @@
 
                 <li class="{{ Route::is('admin.order-control') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.order-control') }}">Order Control</a></li>
                 <li class="{{ Route::is('admin.printer-setting') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.printer-setting') }}">Printer Settings</a></li>
-                <li class="{{ Route::is('admin.pos-tables') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.pos-tables') }}"><i class="fas fa-chair mr-1"></i>POS Tables</a></li>
+                <li class="{{ Route::is('admin.pos-tables') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.pos-tables') }}">POS Tables</a></li>
 
             </ul>
           </li>
