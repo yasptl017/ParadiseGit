@@ -193,7 +193,7 @@
                 type: 'GET',
                 success: function(response) {
                     if (response.receipt) {
-                        $('#receiptContent').text(response.receipt);
+                        $('#receiptContent').text(response.receipt.replace(/\[\/?(BOLD|CENTER)\]/g, ''));
                     } else {
                         $('#receiptContent').text('No receipt saved yet.\nPrint the order first to generate a receipt.');
                     }

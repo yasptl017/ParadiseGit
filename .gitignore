@@ -30,3 +30,5 @@ package-lock.json
 /storage/framework/testing/*
 /storage/framework/views/*
 /storage/logs/*
+/print-agent/build/
+/print-agent/dist/

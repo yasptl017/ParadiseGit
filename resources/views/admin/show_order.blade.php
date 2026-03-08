@@ -500,7 +500,7 @@
                 type: 'GET',
                 success: function(response) {
                     if (response.receipt) {
-                        $('#receiptContent').text(response.receipt);
+                        $('#receiptContent').text(response.receipt.replace(/\[\/?(BOLD|CENTER)\]/g, ''));
                     } else {
                         $('#receiptContent').text('No receipt saved yet.\nUse the Print button to generate and save a receipt.');
                     }
