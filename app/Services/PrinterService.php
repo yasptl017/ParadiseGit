@@ -244,8 +244,9 @@ class PrinterService
             $output .= sprintf("%-1s %12s\n", "Status:", "*** PAID ***");
         }
 
-        $output .= "[BOLD]Thank you![/BOLD]\n";
-        return $output;
+        $output .= "[BOLD]Thank you![/BOLD]";
+
+        return $this->appendTrailingBlankLines($output);
     }
 
     protected function formatKitchenDetails($order): string
@@ -286,7 +287,13 @@ class PrinterService
             $output .= str_repeat("-", 42) . "\n";
         }
 
-        return $output;
+        return $this->appendTrailingBlankLines($output);
+    }
+
+    protected function appendTrailingBlankLines(string $output, int $blankLines = 2): string
+    {
+        // Feed the paper a little so the printer doesn't clip the last line.
+        return rtrim($output, "\n") . str_repeat("\n", $blankLines + 1);
     }
 
     protected function normalizePrinterName($name)
