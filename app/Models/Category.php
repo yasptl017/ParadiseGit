@@ -9,6 +9,10 @@ class Category extends Model
 {
     use HasFactory;
 
+    protected $casts = [
+        'show_on_place_order_receipt' => 'boolean',
+    ];
+
     public function products(){
         return $this->hasMany(Product::class);
     }

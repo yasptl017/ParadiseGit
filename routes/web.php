@@ -386,6 +386,8 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
         // Category Order
         Route::get('category-order',        [CategoryOrderController::class, 'index'])->name('category-order');
         Route::post('category-order/save',  [CategoryOrderController::class, 'save'])->name('category-order.save');
+        Route::post('category-order/receipt-visibility/{category}', [CategoryOrderController::class, 'updateReceiptVisibility'])
+            ->name('category-order.receipt-visibility');
 
         Route::get('reservation', [OrderController::class, 'reservation'])->name('reservation');
         Route::get('reservation-notifications', [OrderController::class, 'reservationNotifications'])->name('reservation-notifications');

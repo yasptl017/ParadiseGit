@@ -7,6 +7,7 @@ use App\Models\PrintJob;
 use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 
 class PrinterService
 {
@@ -175,6 +176,19 @@ class PrinterService
     {
         $output   = "";
         $subtotal = 0;
+        $allItems = $order->items ?? [];
+
+        if ($allItems instanceof \Illuminate\Support\Collection) {
+            $allItems = $allItems->all();
+        } elseif ($allItems instanceof \Traversable) {
+            $allItems = iterator_to_array($allItems, false);
+        } elseif (!is_array($allItems)) {
+            $allItems = (array) $allItems;
+        }
+
+        foreach ($allItems as $item) {
+            $subtotal += (float) ($item->price ?? 0);
+        }
 
         $output .= "[CENTER][BOLD]Punjabi Paradise[/BOLD][/CENTER]\n";
         $output .= "[CENTER]419 High Street, Penrith, 2750[/CENTER]\n";
@@ -195,11 +209,9 @@ class PrinterService
         $output .= sprintf("%-4s %-30s %6s\n", "Qty", "Item", "Amount");
         $output .= str_repeat("-", 42) . "\n";
 
-        $sortedItems = $this->sortItemsByReceiptCategoryOrder($order->items ?? []);
+        $sortedItems = $this->sortItemsByReceiptCategoryOrder($order->items ?? [], true);
 
         foreach ($sortedItems as $item) {
-            $subtotal += $item->price;
-
             $name = (empty($item->size) || strtolower($item->size) === 'regular')
                 ? $item->name
                 : $item->name . '-' . $item->size;
@@ -302,7 +314,7 @@ class PrinterService
         return $name !== '' ? $name : null;
     }
 
-    protected function sortItemsByReceiptCategoryOrder($items): array
+    protected function sortItemsByReceiptCategoryOrder($items, bool $hideOnPlaceOrderReceipt = false): array
     {
         if (empty($items)) {
             return [];
@@ -320,17 +332,42 @@ class PrinterService
             return [];
         }
 
-        $categorySortById = Category::orderBy('receipt_sort_order')
+        $hasPlaceOrderReceiptVisibilityColumn = Schema::hasColumn('categories', 'show_on_place_order_receipt');
+
+        $categoryColumns = ['id', 'name', 'receipt_sort_order'];
+        if ($hasPlaceOrderReceiptVisibilityColumn) {
+            $categoryColumns[] = 'show_on_place_order_receipt';
+        }
+
+        $categories = Category::orderBy('receipt_sort_order')
             ->orderBy('id')
+            ->get($categoryColumns);
+
+        $categorySortById = $categories
             ->pluck('receipt_sort_order', 'id')
             ->map(fn ($value) => (int) $value)
             ->toArray();
 
-        $categorySortByName = Category::orderBy('receipt_sort_order')
-            ->orderBy('id')
+        $categorySortByName = $categories
             ->pluck('receipt_sort_order', 'name')
             ->mapWithKeys(function ($value, $name) {
                 return [mb_strtolower(trim((string) $name)) => (int) $value];
+            })
+            ->toArray();
+
+        $categoryVisibilityById = $categories
+            ->mapWithKeys(function ($category) use ($hasPlaceOrderReceiptVisibilityColumn) {
+                return [$category->id => $hasPlaceOrderReceiptVisibilityColumn
+                    ? (bool) ($category->show_on_place_order_receipt ?? true)
+                    : true];
+            })
+            ->toArray();
+
+        $categoryVisibilityByName = $categories
+            ->mapWithKeys(function ($category) use ($hasPlaceOrderReceiptVisibilityColumn) {
+                return [mb_strtolower(trim((string) $category->name)) => $hasPlaceOrderReceiptVisibilityColumn
+                    ? (bool) ($category->show_on_place_order_receipt ?? true)
+                    : true];
             })
             ->toArray();
 
@@ -353,19 +390,27 @@ class PrinterService
         $rows = [];
         foreach ($items as $index => $item) {
             $sortOrder = 9999;
+            $showOnPlaceOrderReceipt = true;
 
             if (isset($item->category_id) && (int) $item->category_id > 0) {
                 $categoryId = (int) $item->category_id;
                 $sortOrder = $categorySortById[$categoryId] ?? 9999;
+                $showOnPlaceOrderReceipt = $categoryVisibilityById[$categoryId] ?? true;
             } elseif (isset($item->category) && trim((string) $item->category) !== '') {
                 $nameKey = mb_strtolower(trim((string) $item->category));
                 $sortOrder = $categorySortByName[$nameKey] ?? 9999;
+                $showOnPlaceOrderReceipt = $categoryVisibilityByName[$nameKey] ?? true;
             } elseif (isset($item->product_id) && (int) $item->product_id > 0) {
                 $productId = (int) $item->product_id;
                 $categoryId = $productCategoryMap[$productId] ?? 0;
                 if ($categoryId > 0) {
                     $sortOrder = $categorySortById[$categoryId] ?? 9999;
+                    $showOnPlaceOrderReceipt = $categoryVisibilityById[$categoryId] ?? true;
                 }
+            }
+
+            if ($hideOnPlaceOrderReceipt && !$showOnPlaceOrderReceipt) {
+                continue;
             }
 
             $rows[] = [

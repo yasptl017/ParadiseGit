@@ -67,6 +67,18 @@
         padding: 2px 7px;
     }
 
+    .sort-item.is-receipt-hidden {
+        background: #fff7ed;
+        border-color: #fed7aa;
+    }
+
+    .receipt-toggle {
+        min-width: 90px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
     .empty-note {
         text-align: center;
         color: #9ca3af;
@@ -179,16 +191,26 @@
                         {{-- RECEIPT TAB --}}
                         <div class="tab-pane fade" id="tab-receipt" role="tabpanel">
                             <p style="font-size:12px; color:#6b7280;">
-                                Affects the order items are grouped by category on the thermal printer receipt. All <strong>Active</strong> categories are listed here.
+                                Affects the order items are grouped by category on the place-order thermal receipt. Turn a category <strong>OFF</strong> to hide it only from the place-order receipt. Kitchen receipts will still show it.
                             </p>
                             @if ($receiptCategories->isEmpty())
                                 <div class="empty-note">No active categories found.</div>
                             @else
                                 <ul class="sort-list" id="receipt-list">
                                     @foreach ($receiptCategories as $i => $cat)
-                                        <li class="sort-item" data-id="{{ $cat->id }}">
+                                        @php
+                                            $showOnPlaceOrderReceipt = $cat->show_on_place_order_receipt ?? true;
+                                        @endphp
+                                        <li class="sort-item {{ $showOnPlaceOrderReceipt ? '' : 'is-receipt-hidden' }}" data-id="{{ $cat->id }}">
                                             <i class="fas fa-grip-vertical drag-handle"></i>
                                             <span class="sort-name">{{ $cat->name }}</span>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm receipt-toggle {{ $showOnPlaceOrderReceipt ? 'btn-success' : 'btn-outline-secondary' }}"
+                                                data-id="{{ $cat->id }}"
+                                                data-enabled="{{ $showOnPlaceOrderReceipt ? 1 : 0 }}">
+                                                {{ $showOnPlaceOrderReceipt ? 'ON' : 'OFF' }}
+                                            </button>
                                             <span class="sort-pos">#{{ $i + 1 }}</span>
                                         </li>
                                     @endforeach
@@ -258,6 +280,52 @@
                         btn.disabled = false;
                         btn.innerHTML = '<i class="fas fa-save mr-1"></i> Save ' +
                             (context === 'home' ? 'Home Page' : context === 'pos' ? 'POS' : 'Receipt') + ' Order';
+                    }
+                });
+            });
+        });
+
+        function applyReceiptToggleState(button, enabled) {
+            var item = button.closest('.sort-item');
+            button.setAttribute('data-enabled', enabled ? '1' : '0');
+            button.textContent = enabled ? 'ON' : 'OFF';
+            button.classList.toggle('btn-success', enabled);
+            button.classList.toggle('btn-outline-secondary', !enabled);
+            if (item) {
+                item.classList.toggle('is-receipt-hidden', !enabled);
+            }
+        }
+
+        document.querySelectorAll('.receipt-toggle').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var categoryId = button.getAttribute('data-id');
+                var currentlyEnabled = button.getAttribute('data-enabled') === '1';
+                var nextEnabled = currentlyEnabled ? 0 : 1;
+                var url = '{{ route("admin.category-order.receipt-visibility", ["category" => "__CATEGORY__"]) }}'
+                    .replace('__CATEGORY__', categoryId);
+
+                button.disabled = true;
+
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        enabled: nextEnabled
+                    },
+                    success: function(res) {
+                        applyReceiptToggleState(button, !!res.enabled);
+                        toastr.success(res.message || 'Receipt visibility updated');
+                    },
+                    error: function(xhr) {
+                        var message = 'Failed to update receipt visibility. Please try again.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+                        toastr.error(message);
+                    },
+                    complete: function() {
+                        button.disabled = false;
                     }
                 });
             });

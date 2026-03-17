@@ -5,6 +5,7 @@ namespace App\Http\Controllers\WEB\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class CategoryOrderController extends Controller
 {
@@ -44,5 +45,28 @@ class CategoryOrderController extends Controller
         }
 
         return response()->json(['message' => 'Order saved successfully']);
+    }
+
+    public function updateReceiptVisibility(Request $request, Category $category)
+    {
+        if (!Schema::hasColumn('categories', 'show_on_place_order_receipt')) {
+            return response()->json([
+                'message' => 'Please run the latest migration before updating receipt visibility.',
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $category->show_on_place_order_receipt = (bool) $validated['enabled'];
+        $category->save();
+
+        return response()->json([
+            'message' => $category->show_on_place_order_receipt
+                ? 'Category will appear on place-order receipts'
+                : 'Category will be hidden from place-order receipts',
+            'enabled' => $category->show_on_place_order_receipt,
+        ]);
     }
 }
