@@ -596,7 +596,7 @@ class OrderController extends Controller
             'customerDetails'=> $customerDetails,
             'type'           => $order->order_type,
             'coupon_name'    => $order->coupon_name,
-            'inst'           => $order->special_note ?? null,
+            'inst'           => $order->special_instructions ?? null,
             'payment_method' => $order->payment_method,
             'status'         => null,
             'tableNumber'    => $order->table_no ?? null,

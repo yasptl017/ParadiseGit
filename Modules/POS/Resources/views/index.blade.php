@@ -544,6 +544,17 @@ select {
                                            style="width:80px;border-radius:7px;border:2px solid #ced4da;">
                                 </div>
 
+                                <!-- SPECIAL INSTRUCTIONS -->
+                                <div style="background:#f1f3f5;border-radius:10px;padding:7px 12px;margin-top:6px;">
+                                    <label for="special_instructions" style="font-size:11px;font-weight:700;color:#6c757d;text-transform:uppercase;letter-spacing:.5px;margin:0 0 4px 0;display:block;">
+                                        <i class="fas fa-clipboard-list text-info mr-1"></i>Special Instructions
+                                    </label>
+                                    <textarea id="special_instructions" rows="2"
+                                              class="form-control form-control-sm"
+                                              placeholder="e.g. No onions, extra spicy..."
+                                              style="border-radius:7px;border:2px solid #ced4da;resize:vertical;">{{ $active_table->special_instructions ?? '' }}</textarea>
+                                </div>
+
                             </div>
                             <div class="card-body" style="padding-top: 8px;">
                                 <div class="shopping-card-body">
@@ -634,6 +645,7 @@ select {
                                           style="display: inline-flex !important;" method="POST"
                                     >
                                         @csrf
+                                        <input type="hidden" name="special_instructions" id="print_special_instructions">
                                         <button type="submit"
                                                 class="btn btn-primary">Update Printers
                                         </button>
@@ -659,6 +671,7 @@ select {
                                     <input type="hidden" value="0.00" name="delivery_fee" id="order_delivery_fee">
                                     <input type="hidden" value="{{ $sub_total }}" name="total_fee" id="order_total_fee">
                                     <input type="hidden" value="card" name="payment_method" id="order_payment_method">
+                                    <input type="hidden" name="special_instructions" id="order_special_instructions">
                                 </form>
                             </div>
                         </div>
@@ -1024,9 +1037,13 @@ select {
                         return;
                     }
                     $("#order_type").val(order_type);
+                    $("#order_special_instructions").val($("#special_instructions").val());
                     $("#placeOrderForm").submit();
                 })
 
+                $("#printOrderForm").on("submit", function () {
+                    $("#print_special_instructions").val($("#special_instructions").val());
+                });
 
                 $("#order_option").on("change", function () {
                     let orderType = $(this).val();

@@ -98,7 +98,8 @@ class POSController extends Controller
             'customers' => $customers,
             'cart_contents' => $active_table->cart,
             'delivery_areas' => $delivery_areas,
-            'pendingOrderCount' => $pendingOrderCount
+            'pendingOrderCount' => $pendingOrderCount,
+            'active_table' => $active_table,
         ]);
     }
 
@@ -416,13 +417,15 @@ style='display: none'
             $cash_on_delivery = 1;
         }
 
-        $order_result = $this->orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $request->address_id, $request->order_type, $cart_contents);
+        $specialInstructions = $request->input('special_instructions', '');
+        $order_result = $this->orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $request->address_id, $request->order_type, $cart_contents, $specialInstructions);
 
         //$this->sendOrderSuccessMail($user, $order_result, 'Cash on Delivery', 0);
         $customerDetails = $request->customerDetails ?? "Walking Customer";
-        $this->printOrder($order_result, $customerDetails, $active_table);
+        $this->printOrder($order_result, $customerDetails, $active_table, $specialInstructions);
         $active_table->cart = [];
         $active_table->resolved_order = [];
+        $active_table->special_instructions = null;
         $active_table->save();
         $notification = trans('admin_validation.Order created successfully');
         $notification = array('messege' => $notification, 'alert-type' => 'success');
@@ -451,7 +454,7 @@ style='display: none'
         );
     }
 
-    public function orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $address_id, $type, $cart_contents)
+    public function orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $address_id, $type, $cart_contents, $specialInstructions = '')
     {
 
         $order = new Order();
@@ -469,6 +472,7 @@ style='display: none'
         $order->order_approval_date = date('Y-m-d');
         $order->cash_on_delivery = $cash_on_delivery;
         $order->order_type = $type ?? 'Pickup';
+        $order->special_instructions = $specialInstructions ?: null;
         $order->save();
 
         foreach ($cart_contents as $index => $cart_content) {
@@ -516,9 +520,9 @@ style='display: none'
         return $order;
     }
 
-    public function printOrder($order_result, $customerDetails, $active_table)
+    public function printOrder($order_result, $customerDetails, $active_table, $specialInstructions = '')
     {
-        $order = $this->getOrderDetails($order_result, $customerDetails, $active_table);
+        $order = $this->getOrderDetails($order_result, $customerDetails, $active_table, $specialInstructions);
         try {
             $receipt = $this->printerService->getFormattedReceipt($order);
 
@@ -537,7 +541,7 @@ style='display: none'
         }
     }
 
-    private function getOrderDetails($order, $customerDetails, $active_table)
+    private function getOrderDetails($order, $customerDetails, $active_table, $specialInstructions = '')
     {
         $orderId = $order['id'];
         $orderProducts = OrderProduct::where('order_id', $orderId)->get();
@@ -569,14 +573,14 @@ style='display: none'
                 'customerDetails' => $customerDetails,
                 'tableNumber' => $active_table->name,
                 'coupon_name' => $order['coupon_name'] ?? null,
-                'inst' => null,
+                'inst' => $specialInstructions ?: null,
                 'order_date' => optional(\App\Models\Order::find($orderId)->created_at)->format('d/m/Y H:i'),
             ];
 
         return $details;
     }
 
-    public function print_order()
+    public function print_order(Request $request)
     {
         $active_table = POSTable::find(Session::get('active_table'));
 
@@ -590,6 +594,10 @@ style='display: none'
             $notification = array('messege' => $notification, 'alert-type' => 'error');
             return redirect()->back()->with($notification);
         }
+
+        // Persist updated special instructions
+        $active_table->special_instructions = $request->input('special_instructions', $active_table->special_instructions);
+        $active_table->save();
 
         $resolved_orders = collect($active_table->resolved_order);
 
@@ -649,6 +657,14 @@ style='display: none'
                 $name = $item['name'] . ($item['options']['size'] !== 'Regular' ? " -" . $item['options']['size'] . "" : '');
                 $output .= sprintf("%-4s %-23s \n\n", $item['qty'], $name);
             }
+            $output .= str_repeat("-", 42) . "\n";
+        }
+
+        // Append special instructions if set
+        $instructions = $active_table->special_instructions;
+        if (!empty($instructions)) {
+            $output .= "SPECIAL INSTRUCTIONS:\n";
+            $output .= wordwrap($instructions, 42) . "\n";
             $output .= str_repeat("-", 42) . "\n";
         }
 

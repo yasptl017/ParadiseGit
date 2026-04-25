@@ -14,6 +14,7 @@ class POSTable extends Model
         'meta',
         'cart',
         'resolved_order',
+        'special_instructions',
     ];
 
     protected $casts = [
