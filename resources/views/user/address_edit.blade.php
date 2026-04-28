@@ -112,6 +112,7 @@
                                                 <div class="col-md-12 col-lg-12 col-xl-12">
                                                     <div class="tf__check_single_form">
                                                         <input type="text" id="address-input" placeholder="Enter address">
+                                                        <input type="hidden" name="postal_code" id="postal-code" value="{{ $address->postal_code }}">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-12 col-lg-12 col-xl-12">
@@ -165,11 +166,14 @@
           // Initialize the Autocomplete service for the first input
           const addressInput = document.getElementById("address-input");
           const selectedAddress = document.getElementById("selected-address");
+          const postalCodeInput = document.getElementById("postal-code");
           const autocomplete = new google.maps.places.Autocomplete(addressInput);
           autocomplete.setFields(['address_components', 'formatted_address', 'name']);
           autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
             selectedAddress.textContent = place.formatted_address;
+            const postalComponent = (place.address_components || []).find(component => component.types.includes('postal_code'));
+            postalCodeInput.value = postalComponent ? postalComponent.long_name : '';
           });
 
         }

@@ -15,6 +15,7 @@ use App\Models\OrderProduct;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\DeliveryChargeResolver;
 use App\Services\PrinterService;
 use Exception;
 use Illuminate\Http\Request;
@@ -32,10 +33,12 @@ use Str;
 class POSController extends Controller
 {
     protected $printerService;
+    protected $deliveryChargeResolver;
 
-    public function __construct(PrinterService $printerService)
+    public function __construct(PrinterService $printerService, DeliveryChargeResolver $deliveryChargeResolver)
     {
         $this->printerService = $printerService;
+        $this->deliveryChargeResolver = $deliveryChargeResolver;
     }
 
     function countOrdersForUserWithinTimeframe($conn, $userId, $timeframe)
@@ -75,6 +78,7 @@ class POSController extends Controller
         $customers = Customer::orderBy('id', 'desc')->get();
 
         $delivery_areas = DeliveryArea::where('status', 1)->get();
+        $delivery_postcode_charges = \App\Models\DeliveryPostcodeCharge::where('status', 1)->get();
 
 
         $active_table = POSTable::find(Session::get('active_table')) ?? POSTable::first();
@@ -98,6 +102,7 @@ class POSController extends Controller
             'customers' => $customers,
             'cart_contents' => $active_table->cart,
             'delivery_areas' => $delivery_areas,
+            'delivery_postcode_charges' => $delivery_postcode_charges,
             'pendingOrderCount' => $pendingOrderCount,
             'active_table' => $active_table,
         ]);
@@ -313,6 +318,7 @@ class POSController extends Controller
                     'phone' => $request->phone,
                     'address' => $request->address,
                     'address_distance' => $request->distance,
+                    'postal_code' => $this->deliveryChargeResolver->normalizePostcode($request->postal_code),
                 ]
             );
             // Fetch all active customers
@@ -395,7 +401,16 @@ style='display: none'
         $cart_contents = $active_table->cart;
 
 
-        $calculate_amount = $this->calculate_amount($request->delivery_fee, $request->coupon_price, $cart_contents);
+        $deliveryCharge = 0;
+        if (($request->order_type ?? 'Pickup') === 'Delivery') {
+            $resolvedDelivery = $this->deliveryChargeResolver->resolvePosCharge(
+                $user->postal_code ?? null,
+                $user->address_distance ?? null
+            );
+            $deliveryCharge = $resolvedDelivery['charge'];
+        }
+
+        $calculate_amount = $this->calculate_amount($deliveryCharge, $request->coupon_price, $cart_contents);
 
         // Resolve payment method and status from request
         $rawMethod = $request->payment_method ?? 'card';
@@ -504,6 +519,7 @@ style='display: none'
         $orderAddress->email = $user->email ?? "No mail"; // Use user-provided email
         $orderAddress->phone = $user->phone ?? "No Phone"; // Use user-provided phone
         $orderAddress->address = $user->address ?? "Pickup Order";
+        $orderAddress->postal_code = $user->postal_code ?? null;
         $orderAddress->longitude = Null;
         $orderAddress->latitude = Null;
         $orderAddress->save();

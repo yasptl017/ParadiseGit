@@ -3,6 +3,7 @@
     {{$slot}}
 
     <input type="hidden" name="distance" id="distance">
+    <input type="hidden" name="postal_code" id="postal_code">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#000000" viewBox="0 0 256 256"
          id="loading-spinner" style="" class="animate-spin loading-spinner">
         <path
@@ -42,8 +43,6 @@
 
 </style>
 <script>
-    const event = new Event('distance-loaded');
-
     /**
      * @license
      * Copyright 2024 Google LLC. All Rights Reserved.
@@ -63,16 +62,23 @@
         autocomplete.addListener('place_changed', async () => {
             document.getElementById("loading-spinner").style.visibility = "visible";
             const place = autocomplete.getPlace();
-            const locality = getLocalityFromAddressComponents(place.address_components);
+            const addressComponents = place.address_components || [];
+            const locality = getLocalityFromAddressComponents(addressComponents);
+            const postalCode = getPostalCodeFromAddressComponents(addressComponents);
+            document.getElementById("postal_code").value = postalCode;
 
             if (locality) {
                 try {
                     const distanceResponse = await calculateDistance(place.formatted_address);
                     const distanceResult = distanceResponse.rows[0].elements[0];
-                    // Do something with the distance result
                     document.getElementById("distance").value = distanceResult.distance.value;
-                    //     emit a js event to notify the parent component
-                    document.dispatchEvent(event);
+                    document.dispatchEvent(new CustomEvent('distance-loaded', {
+                        detail: {
+                            distance: distanceResult.distance.value,
+                            postal_code: postalCode,
+                            address: place.formatted_address
+                        }
+                    }));
 
                 } catch (error) {
                     console.error("Error calculating distance:", error);
@@ -88,6 +94,15 @@
         for (const component of addressComponents) {
             if (component.types.includes('locality')) {
                 return component.long_name;
+            }
+        }
+        return '';
+    }
+
+    function getPostalCodeFromAddressComponents(addressComponents) {
+        for (const component of addressComponents) {
+            if (component.types.includes('postal_code')) {
+                return component.long_name || '';
             }
         }
         return '';

@@ -80,7 +80,7 @@
             </ul>
           </li>
 
-          <li class="nav-item dropdown {{ Route::is('admin.coupon.*') || Route::is('admin.payment-method') || Route::is('admin.delivery-area.*') ? 'active' : '' }}">
+          <li class="nav-item dropdown {{ Route::is('admin.coupon.*') || Route::is('admin.payment-method') || Route::is('admin.delivery-area.*') || Route::is('admin.delivery-postcode-charge.*') ? 'active' : '' }}">
             <a href="#" class="nav-link has-dropdown"><i class="fas fa-shopping-cart"></i><span>{{__('admin.Ecommerce')}}</span></a>
             <ul class="dropdown-menu">
 
@@ -89,6 +89,8 @@
                 <li class="{{ Route::is('admin.payment-method') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.payment-method') }}">{{__('admin.Payment Method')}}</a></li>
 
                 <li class="{{ Route::is('admin.delivery-area.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.delivery-area.index') }}">{{__('admin.Delivery Area')}}</a></li>
+
+                <li class="{{ Route::is('admin.delivery-postcode-charge.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.delivery-postcode-charge.index') }}">Delivery Postcode</a></li>
 
             </ul>
           </li>
@@ -101,25 +103,6 @@
                 <li class="{{ Route::is('admin.customer-list') || Route::is('admin.customer-show') || Route::is('admin.send-email-to-all-customer') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.customer-list') }}">{{__('admin.Customer List')}}</a></li>
 
                 <li class="{{ Route::is('admin.pending-customer-list') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.pending-customer-list') }}">{{__('admin.Pending Customers')}}</a></li>
-
-            </ul>
-          </li>
-
-          <li class="nav-item dropdown {{ Route::is('admin.service.*') || Route::is('admin.slider.*') || Route::is('admin.counter.*') || Route::is('admin.app-section') || Route::is('admin.partner.*') || Route::is('admin.slider-intro') || Route::is('admin.appointment-bg') || Route::is('admin.login-page') ? 'active' : '' }}">
-            <a href="#" class="nav-link has-dropdown"><i class="fas fa-shopping-cart"></i><span>{{__('admin.Section')}}</span></a>
-            <ul class="dropdown-menu">
-
-                <li class="{{ Route::is('admin.slider-intro') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.slider-intro') }}">{{__('admin.Intro')}}</a></li>
-
-                <li class="{{ Route::is('admin.slider.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.slider.index') }}">{{__('admin.Gallery')}}</a></li>
-
-                <li class="{{ Route::is('admin.counter.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.counter.index') }}">{{__('admin.Counter')}}</a></li>
-
-                <li class="{{ Route::is('admin.appointment-bg') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.appointment-bg') }}">{{__('admin.Appointment')}}</a></li>
-
-                <li class="{{ Route::is('admin.app-section') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.app-section') }}">{{__('admin.App Section')}}</a></li>
-
-                <li class="{{ Route::is('admin.login-page') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.login-page') }}">{{__('admin.Admin Login Page')}}</a></li>
 
             </ul>
           </li>

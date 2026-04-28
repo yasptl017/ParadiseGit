@@ -22,6 +22,7 @@ use App\Http\Controllers\WEB\Admin\CustomerController;
 use App\Http\Controllers\WEB\Admin\CustomPageController;
 use App\Http\Controllers\WEB\Admin\DashboardController;
 use App\Http\Controllers\WEB\Admin\DeliveryAreaCotroller;
+use App\Http\Controllers\WEB\Admin\DeliveryPostcodeChargeController;
 use App\Http\Controllers\WEB\Admin\EmailConfigurationController;
 use App\Http\Controllers\WEB\Admin\EmailTemplateController;
 use App\Http\Controllers\WEB\Admin\ErrorPageController;
@@ -431,6 +432,7 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
         Route::put('update-homepage', [HomepageController::class, 'update_homepage'])->name('update-homepage');
 
         Route::resource('delivery-area', DeliveryAreaCotroller::class);
+        Route::resource('delivery-postcode-charge', DeliveryPostcodeChargeController::class);
     });
 
 

@@ -300,7 +300,7 @@
 
 <script>
 (function () {
-    var RECEIPT_TEXT = @json($order->print_receipt ?? '');
+    var RECEIPT_TEXT = @json(\App\Services\PrinterService::stripReceiptFormattingTags($order->print_receipt ?? ''));
     var ORDER_ID     = @json($order->order_id ?? 'receipt');
 
     /* ── Draw receipt text onto a Canvas and return it ── */

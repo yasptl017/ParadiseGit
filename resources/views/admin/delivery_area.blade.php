@@ -14,6 +14,8 @@
             <div class="section-body">
                 <a href="{{ route('admin.delivery-area.create') }}" class="btn btn-primary"><i
                         class="fas fa-plus"></i> {{__('admin.Add New')}}</a>
+                <a href="{{ route('admin.delivery-postcode-charge.index') }}" class="btn btn-secondary ml-2"><i
+                        class="fas fa-mail-bulk"></i> Delivery Postcode Charges</a>
                 <div class="row mt-4">
                     <div class="col">
                         <div class="card">

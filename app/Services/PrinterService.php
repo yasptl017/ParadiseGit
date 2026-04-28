@@ -115,6 +115,16 @@ class PrinterService
         return $this->formatOrderDetails($order);
     }
 
+    public function getCustomerReceiptText(string $receipt): string
+    {
+        return $this->stripReceiptFormattingTags($receipt);
+    }
+
+    public static function stripReceiptFormattingTags(string $receipt): string
+    {
+        return preg_replace('/\[\/?(BOLD|CENTER)\]/', '', $receipt) ?? $receipt;
+    }
+
     /**
      * If print_mode is 'push', immediately POST the job to the local print agent
      * running on localhost:{agent_port}. Falls back silently if agent is unreachable.

@@ -179,6 +179,7 @@
         <p>{{__('user.delivery')}} (+): <span class="delivery_charge">{{ $currency_icon }}0.00</span></p>
         <p class="total"><span>{{__('user.Total')}}:</span> <span class="grand_total">{{ $currency_icon }}{{ $sub_total - $coupon_price }}</span></p>
         <input type="hidden" id="grand_total" value="{{ $sub_total - $coupon_price }}">
+        <input type="hidden" id="cart_subtotal" value="{{ $sub_total }}">
         
         <!-- Add the offer display here -->
          <!--
@@ -732,6 +733,8 @@
             $form.append('<input type="hidden" name="user_email" value="' + $('#user_email').val() + '">');
             $form.append('<input type="hidden" name="user_phone" value="' + $('#user_phone').val() + '">');
             $form.append('<input type="hidden" name="address" value="' + $('#address-input').val() + '">');
+            $form.append('<input type="hidden" name="distance" value="' + ($('#distance').val() || '') + '">');
+            $form.append('<input type="hidden" name="postal_code" value="' + ($('#postal_code').val() || '') + '">');
             $form.append('<input type="hidden" name="delivery_instructions" value="' + $('#delivery-inst').val() + '">');
             // Validate other form inputs
             $errorMessage.addClass('d-none');
@@ -817,114 +820,71 @@
         $('#address-warning').addClass('d-none'); // Hide warning
     });
 
-    const addresses = {{Js::from($delivery_areas)}};
+    function updateCheckoutTotals(fee) {
+        const deliveryFee = parseFloat(fee) || 0;
+        const baseTotal = parseFloat(document.querySelector('#grand_total').value) || 0;
+        const payableTotal = baseTotal + deliveryFee;
+        const formattedTotal = '{{ $currency_icon }}' + payableTotal.toFixed(2);
 
-    document.addEventListener('distance-loaded', function () {
-        const deliveryDistance = document.querySelector("#distance").value;
-        let fee;
+        document.querySelector('.delivery_charge').innerText = '{{ $currency_icon }}' + deliveryFee.toFixed(2);
+        document.querySelector('.grand_total').innerText = formattedTotal;
 
-        // check if grand total quailifies for free delivery
-        if (parseFloat(document.querySelector('#grand_total').value) >= {{env('MINIMUM_AMOUNT')}}) {
-            fee = 0;
+        const modalTotal = document.querySelector('#pay-modal-grand-total');
+        const payButtonLabel = document.querySelector('#pay-btn-label');
+
+        if (modalTotal) {
+            modalTotal.innerText = formattedTotal;
         }
 
-        // check if delivery distance is within the delivery range
-        if (deliveryDistance / 1000 > {{env('MAXIMUM_DISTANCE')}}) {
-            toastr.error('Delivery is not available for this location');
+        if (payButtonLabel) {
+            payButtonLabel.innerText = 'Pay ' + formattedTotal;
+        }
+    }
+
+    function syncDeliveryCharge() {
+        const deliveryDistance = document.querySelector("#distance").value;
+        const postalCode = document.querySelector("#postal_code").value;
+        const subTotal = document.querySelector('#cart_subtotal').value;
+
+        if (!deliveryDistance) {
+            $('#continue_to_pay').css('display', 'none');
+            $('#distance-warning-dd').removeClass('d-none');
             return;
         }
-
-        addresses.forEach(area => {
-
-            if (fee) {
-                return;
-            }
-
-            if (area.min_range <= deliveryDistance / 1000 && area.max_range >= deliveryDistance / 1000) {
-                fee = area.delivery_fee;
-            }
-        });
-
-        if (fee === undefined || fee === null) {
-            fee = {{env('DEFAULTS_DELIVERY')}}
-        }
-        document.querySelector('.delivery_charge').innerText = '{{ $currency_icon }}' + fee;
-        document.querySelector('.grand_total').innerText = '{{ $currency_icon }}' + (parseFloat(document.querySelector('#grand_total').value) + parseFloat(fee));
-        // send an ajax request to store the delivery fee
 
         $.ajax({
             url: "{{ route('set-delivery-charge') }}",
             type: "GET",
             data: {
-                charge: fee
+                distance: deliveryDistance,
+                postal_code: postalCode,
+                subtotal: subTotal
             },
             success: function (response) {
-                console.log(response);
-                // enable the continue to pay button
-                $('#continue_to_pay').prop('disabled', false);
-
-            }
-        });
-
-    })
-
-})(jQuery);
-
-    </script>
-
-    <script>
-        const addresses = {{Js::from($delivery_areas)}};
-
-        document.addEventListener('distance-loaded', function () {
-            const deliveryDistance = document.querySelector("#distance").value;
-            let fee;
-
-
-            // check if grand total quailifies for free delivery
-            if (parseFloat(document.querySelector('#grand_total').value) >= {{env('MINIMUM_AMOUNT')}}) {
-                fee = 0;
-            }
-
-            // check if delivery distance is within the delivery range
-            if (deliveryDistance / 1000 > {{env('MAXIMUM_DISTANCE')}}) {
-                toastr.error('Delivery is not available for this location');
-                return;
-            }
-
-
-            addresses.forEach(area => {
-
-                if (fee) {
+                if (!response.available) {
+                    $('#continue_to_pay').css('display', 'none');
+                    $('#distance-warning').removeClass('d-none');
+                    toastr.error('Delivery is not available for this location');
                     return;
                 }
 
-                if (area.min_range <= deliveryDistance / 1000 && area.max_range >= deliveryDistance / 1000) {
-                    fee = area.delivery_fee;
-                }
-            });
-
-            if (fee === undefined || fee === null) {
-                fee = {{env('DEFAULTS_DELIVERY')}}
+                $('#distance-warning').addClass('d-none');
+                $('#distance-warning-dd').addClass('d-none');
+                $('#continue_to_pay').css('display', 'block');
+                updateCheckoutTotals(response.charge);
+                $('#continue_to_pay').prop('disabled', false);
+            },
+            error: function () {
+                toastr.error("{{ __('user.Server error occured') }}");
             }
-            document.querySelector('.delivery_charge').innerText = '{{ $currency_icon }}' + fee;
-            document.querySelector('.grand_total').innerText = '{{ $currency_icon }}' + (parseFloat(document.querySelector('#grand_total').value) + parseFloat(fee));
-            //     send an ajax request to store the delivery fee
+        });
+    }
 
-            $.ajax({
-                url: "{{ route('set-delivery-charge') }}",
-                type: "GET",
-                data: {
-                    charge: fee
-                },
-                success: function (response) {
-                    console.log(response);
-                    //     enable the continue to pay button
-                    $('#continue_to_pay').prop('disabled', false);
+    document.addEventListener('distance-loaded', function () {
+        syncDeliveryCharge();
+    });
 
-                }
-            });
-
-        })
+})(jQuery);
 
     </script>
     <script>

@@ -12,5 +12,6 @@ class Customer extends Model
         'phone',
         'address',
         'address_distance',
+        'postal_code',
     ];
 }

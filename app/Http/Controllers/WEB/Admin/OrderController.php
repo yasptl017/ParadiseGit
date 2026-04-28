@@ -525,7 +525,7 @@ class OrderController extends Controller
         $options->set('isHtml5ParserEnabled', true);
         $pdf = new Dompdf($options);
 
-        $receiptText = e($order->print_receipt ?: 'No receipt data available.');
+        $receiptText = e(PrinterService::stripReceiptFormattingTags($order->print_receipt ?: 'No receipt data available.'));
         $html = '
             <!doctype html>
             <html>

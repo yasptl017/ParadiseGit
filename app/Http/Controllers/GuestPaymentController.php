@@ -12,6 +12,7 @@ use App\Models\OrderAddress;
 use App\Models\OrderProduct;
 use App\Models\Setting;
 use App\Models\StripePayment;
+use App\Services\DeliveryChargeResolver;
 use App\Services\PrinterService;
 use Cart;
 use Illuminate\Http\Request;
@@ -23,7 +24,9 @@ use App\Jobs\SendOrderSuccessEmail;
 
 class GuestPaymentController extends Controller
 {
-
+    public function __construct(private readonly DeliveryChargeResolver $deliveryChargeResolver)
+    {
+    }
 
     public function pickup()
     {
@@ -39,6 +42,8 @@ class GuestPaymentController extends Controller
             return redirect()->route('home')->with($notification);
         }
         Session::put('delivery_charge', 0);
+        Session::forget('delivery_postal_code');
+        Session::forget('delivery_distance');
         //$addresses = Address::with('deliveryArea')->where(['user_id' => $user->id])->get();
         $cart_contents = Cart::content();
         Session::put('order_type', 1);
@@ -128,6 +133,23 @@ class GuestPaymentController extends Controller
         $userPhone = $request->input('user_phone');
         $userAddress = $request->input('address') ?? "Pickup Order";
         $inst = $request->input('delivery_instructions');
+
+        if ((int) Session::get('order_type') === 2) {
+            $resolution = $this->deliveryChargeResolver->resolveWebsiteCharge(
+                $request->input('postal_code'),
+                $request->input('distance'),
+                $this->calculateCartSubtotal()
+            );
+
+            if (!$resolution['available']) {
+                $notification = ['messege' => 'Delivery is not available for this address.', 'alert-type' => 'error'];
+                return redirect()->route('delivery')->with($notification);
+            }
+
+            Session::put('delivery_charge', $resolution['charge']);
+            Session::put('delivery_postal_code', $this->deliveryChargeResolver->normalizePostcode($request->input('postal_code')));
+            Session::put('delivery_distance', $request->input('distance'));
+        }
  
         $cart_contents = Cart::content();
         $calculate_amount = $this->calculate_amount(7);
@@ -224,6 +246,7 @@ class GuestPaymentController extends Controller
         $orderAddress->email = $userEmail; // Use user-provided email
         $orderAddress->phone = $userPhone; // Use user-provided phone
         $orderAddress->address = $address ?? "Pickup Order";
+        $orderAddress->postal_code = Session::get('delivery_postal_code');
         $orderAddress->longitude = Null;
         $orderAddress->latitude = Null;
         $orderAddress->save();
@@ -241,6 +264,8 @@ class GuestPaymentController extends Controller
         Session::forget('order_type');
         Session::forget('delivery_id');
         Session::forget('delivery_charge');
+        Session::forget('delivery_postal_code');
+        Session::forget('delivery_distance');
         Session::forget('coupon_price');
         Session::forget('offer_type');
         Cart::destroy();
@@ -281,7 +306,9 @@ class GuestPaymentController extends Controller
         }
 
         $fileName = 'receipt-' . $order->id . '.txt';
-        return response($order->print_receipt)
+        $receiptText = PrinterService::stripReceiptFormattingTags($order->print_receipt);
+
+        return response($receiptText)
             ->header('Content-Type', 'text/plain; charset=UTF-8')
             ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"');
     }
@@ -289,7 +316,45 @@ class GuestPaymentController extends Controller
     public function set_delivery_charge(Request $request)
     {
         Session::put('delivery_id', $request->delivery_id);
-        Session::put('delivery_charge', $request->charge);
+        if (!$request->filled('distance')) {
+            Session::put('delivery_charge', 0);
+            Session::forget('delivery_postal_code');
+            Session::forget('delivery_distance');
+
+            return response()->json([
+                'available' => true,
+                'charge' => 0,
+                'source' => 'pickup',
+            ]);
+        }
+
+        $resolution = $this->deliveryChargeResolver->resolveWebsiteCharge(
+            $request->input('postal_code'),
+            $request->input('distance'),
+            (float) $request->input('subtotal', 0)
+        );
+
+        if (!$resolution['available']) {
+            Session::forget('delivery_charge');
+            Session::forget('delivery_postal_code');
+            Session::forget('delivery_distance');
+
+            return response()->json([
+                'available' => false,
+                'charge' => 0,
+                'source' => $resolution['source'],
+            ]);
+        }
+
+        Session::put('delivery_charge', $resolution['charge']);
+        Session::put('delivery_postal_code', $this->deliveryChargeResolver->normalizePostcode($request->input('postal_code')));
+        Session::put('delivery_distance', $request->input('distance'));
+
+        return response()->json([
+            'available' => true,
+            'charge' => $resolution['charge'],
+            'source' => $resolution['source'],
+        ]);
     }
 
     public function sendOrderSuccessMail($userName, $userEmail, $userPhone, $order_result, $payment_method, $payment_status)
@@ -380,5 +445,18 @@ class GuestPaymentController extends Controller
             'customerDetails' => implode("\n", $customerLines),
             'order_date' => optional($order->created_at)->format('d/m/Y H:i'),
         ];
+    }
+
+    private function calculateCartSubtotal(): float
+    {
+        $subTotal = 0;
+
+        foreach (Cart::content() as $cartContent) {
+            $itemPrice = $cartContent->price * $cartContent->qty;
+            $itemTotal = $itemPrice + $cartContent->options->optional_item_price;
+            $subTotal += $itemTotal;
+        }
+
+        return (float) $subTotal;
     }
 }

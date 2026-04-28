@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Address;
 use App\Models\DeliveryArea;
 use App\Models\User;
+use App\Services\DeliveryChargeResolver;
 use Auth;
 use Illuminate\Http\Request;
 
 class AddressCotroller extends Controller
 {
-    public function __construct()
+    public function __construct(private readonly DeliveryChargeResolver $deliveryChargeResolver)
     {
         $this->middleware('auth:web');
     }
@@ -70,6 +71,7 @@ class AddressCotroller extends Controller
         $address->email = $request->email;
         $address->phone = $request->phone;
         $address->address = $request->address;
+        $address->postal_code = $this->deliveryChargeResolver->normalizePostcode($request->postal_code);
         $address->latitude = $request->distance; // Assuming distance is stored in meters
     
         // Convert distance to kilometers
@@ -147,6 +149,9 @@ class AddressCotroller extends Controller
         $address->email = $request->email;
         $address->phone = $request->phone;
         $address->address = $request->address;
+        if ($request->has('postal_code')) {
+            $address->postal_code = $this->deliveryChargeResolver->normalizePostcode($request->postal_code);
+        }
         $address->type = $request->address_type;
         $address->save();
 
@@ -200,6 +205,7 @@ class AddressCotroller extends Controller
         $address->email = $request->email;
         $address->phone = $request->phone;
         $address->address = $request->address;
+        $address->postal_code = $this->deliveryChargeResolver->normalizePostcode($request->postal_code);
         $address->type = $request->address_type;
     
         // Convert distance to kilometers

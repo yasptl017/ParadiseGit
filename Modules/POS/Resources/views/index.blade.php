@@ -484,6 +484,7 @@ select {
                                                 data-order-count="{{ $customer->orderCount }}"
                                                 data-address="{{ $customer->address }}"
                                                 data-distance="{{ $customer->address_distance }}"
+                                                data-postal-code="{{ $customer->postal_code }}"
                                                 data-phone="{{ $customer->phone }}"
                                                 data-email="{{ $customer->email ?? '' }}"
                                         >
@@ -742,6 +743,7 @@ select {
                                      data-email="{{ $customer->email ?? '' }}"
                                      data-address="{{ $customer->address ?? '' }}"
                                      data-distance="{{ $customer->address_distance ?? 0 }}"
+                                     data-postal-code="{{ $customer->postal_code ?? '' }}"
                                      data-ordercount="{{ $customer->orderCount }}"
                                      onclick="selectCustomerFromModal(this)">
                                     <div class="ci-avatar">{{ strtoupper(substr($customer->name, 0, 1)) }}</div>
@@ -986,6 +988,19 @@ select {
                 $("#customer_id").on("change", updateCustomerID);
                 $("#customer_id").on("change", updateOrderCount);
 
+                const postcodeDeliveryCharges = {{ Js::from($delivery_postcode_charges) }};
+
+                function findPostcodeDeliveryCharge(postcode) {
+                    if (!postcode) {
+                        return null;
+                    }
+
+                    const normalizedPostcode = String(postcode).replace(/\s+/g, '').toUpperCase();
+                    return postcodeDeliveryCharges.find(charge => {
+                        return String(charge.postcode).replace(/\s+/g, '').toUpperCase() === normalizedPostcode;
+                    }) || null;
+                }
+
                 function updateDeliverCharge() {
                     const orderType = $("#order_option").val();
                     if (orderType === "Pickup" || orderType === "DineIn") {
@@ -995,13 +1010,19 @@ select {
                         const selectedOption = this.options[selectedIndex];
                         const areas = {{Js::from($delivery_areas)}};
                         const deliveryDistance = selectedOption.getAttribute('data-distance');
+                        const postalCode = selectedOption.getAttribute('data-postal-code');
+                        const postcodeCharge = findPostcodeDeliveryCharge(postalCode);
 
                         $('#order_delivery_fee').val(0);
-                        areas.forEach(area => {
-                            if (area.min_range <= deliveryDistance / 1000 && area.max_range >= deliveryDistance / 1000) {
-                                document.querySelector("#order_delivery_fee").value = area.delivery_fee;
-                            }
-                        });
+                        if (postcodeCharge) {
+                            document.querySelector("#order_delivery_fee").value = postcodeCharge.delivery_fee;
+                        } else {
+                            areas.forEach(area => {
+                                if (area.min_range <= deliveryDistance / 1000 && area.max_range >= deliveryDistance / 1000) {
+                                    document.querySelector("#order_delivery_fee").value = area.delivery_fee;
+                                }
+                            });
+                        }
                     }
                     calculateTotalFee();
                 }

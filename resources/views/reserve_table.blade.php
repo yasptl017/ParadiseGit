@@ -178,8 +178,8 @@
                                     <h1>{{ $setting->slider_header_two }}</h1>
                                     <p>{{ $setting->slider_description }}</p>
                                    <form action="{{ route('products') }}">
-                                        <input type="text" placeholder="{{('user.Type here..')}}" name="search">
-                                        <button type="submit" class="common_btn">{{('user.search')}}</button>
+                                        <input type="text" placeholder="{{__('user.Type here..')}}" name="search">
+                                        <button type="submit" class="common_btn">{{__('user.search')}}</button>
                                     </form>
                                 </div>
                             </div>
@@ -266,38 +266,38 @@
                                 <div class="row">
                                     <div class="col-xl-6 col-lg-6">
                                         <div class="tf__reservation_input_single">
-                                            <label for="name">{{('user.Name')}}</label>
-                                            <input type="text" id="name" placeholder="{{('user.Name')}}" name="name">
+                                            <label for="name">{{__('user.Name')}}</label>
+                                            <input type="text" id="name" placeholder="{{__('user.Name')}}" name="name">
                                         </div>
                                     </div>
                                     <div class="col-xl-6 col-lg-6">
                                         <div class="tf__reservation_input_single">
-                                            <label for="email">{{('user.Email')}}</label>
-                                            <input type="email" id="email" placeholder="{{('user.Email')}}" name="email">
+                                            <label for="email">{{__('user.Email')}}</label>
+                                            <input type="email" id="email" placeholder="{{__('user.Email')}}" name="email">
                                         </div>
                                     </div>
                                     <div class="col-xl-6 col-lg-6">
                                         <div class="tf__reservation_input_single">
-                                            <label for="phone">{{('user.Phone')}}</label>
-                                            <input type="text" id="phone" placeholder="{{('user.Phone')}}" name="phone">
+                                            <label for="phone">{{__('user.Phone')}}</label>
+                                            <input type="text" id="phone" placeholder="{{__('user.Phone')}}" name="phone">
                                         </div>
                                     </div>
                                     <div class="col-xl-6 col-lg-6">
                                         <div class="tf__reservation_input_single">
-                                            <label for="date">{{('user.Select date')}}</label>
+                                            <label for="date">{{__('user.Select date')}}</label>
                                             <input type="date" id="date" name="reserve_date">
                                         </div>
                                     </div>
                                     <div class="col-xl-6 col-lg-6">
                                         <div class="tf__reservation_input_single">
-                                            <label for="time">{{('user.Select Time')}}</label>
+                                            <label for="time">{{__('user.Select Time')}}</label>
                                             <input type="time" id="time" name="reserve_time">
                                         </div>
                                     </div>
                                     <div class="col-xl-6 col-lg-6">
                                         <div class="tf__reservation_input_single">
-                                            <label for="Person">{{('user.Person')}}</label>
-                                            <input type="number" id="Person" placeholder="{{('user.Person')}}" name="person">
+                                            <label for="Person">{{__('user.Person')}}</label>
+                                            <input type="number" id="Person" placeholder="{{__('user.Person')}}" name="person">
                                         </div>
                                     </div>
                                     <div class="col-xl-12">

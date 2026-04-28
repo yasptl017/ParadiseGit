@@ -72,6 +72,9 @@ class PaymentController extends Controller
             return redirect()->route('products')->with($notification);
         }
 
+        Session::put('delivery_charge', 0);
+        Session::forget('delivery_postal_code');
+        Session::forget('delivery_distance');
         $user = Auth::guard('web')->user();
         $addresses = Address::with('deliveryArea')->where(['user_id' => $user->id])->get();
         $cart_contents = Cart::content();
@@ -353,6 +356,7 @@ class PaymentController extends Controller
             $orderAddress->email = $find_address->email;
             $orderAddress->phone = $find_address->phone;
             $orderAddress->address = $find_address->address;
+            $orderAddress->postal_code = $find_address->postal_code ?? Session::get('delivery_postal_code');
             $orderAddress->longitude = $find_address->longitude;
             $orderAddress->latitude = $find_address->latitude;
             $orderAddress->delivery_time = $find_delivery_address->min_time . ' - ' . $find_delivery_address->max_time;
@@ -361,6 +365,8 @@ class PaymentController extends Controller
         Session::forget('order_type');
         Session::forget('delivery_id');
         Session::forget('delivery_charge');
+        Session::forget('delivery_postal_code');
+        Session::forget('delivery_distance');
         Session::forget('coupon_price');
         Session::forget('offer_type');
         Session::forget('coupon_price');
@@ -552,6 +558,7 @@ class PaymentController extends Controller
         $orderAddress->email = $userEmail; // Use user-provided email
         $orderAddress->phone = $userPhone; // Use user-provided phone
         $orderAddress->address = $address ?? "Pickup Order";
+        $orderAddress->postal_code = Session::get('delivery_postal_code');
         $orderAddress->longitude = Null;
         $orderAddress->latitude = Null;
         $orderAddress->save();
@@ -560,6 +567,8 @@ class PaymentController extends Controller
         Session::forget('order_type');
         Session::forget('delivery_id');
         Session::forget('delivery_charge');
+        Session::forget('delivery_postal_code');
+        Session::forget('delivery_distance');
         Session::forget('coupon_price');
         Session::forget('offer_type');
         Cart::destroy();
