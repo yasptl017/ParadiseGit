@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\PrintJob;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Support\AppSettings;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
 
@@ -141,7 +142,7 @@ class PrinterService
             'order_id' => $job->order_id,
             'printer'  => $job->printer,
             'content'  => $job->content,
-            'key'      => env('PRINT_AGENT_KEY'),
+            'key'      => AppSettings::value('print_agent_key', env('PRINT_AGENT_KEY')),
         ]);
 
         try {

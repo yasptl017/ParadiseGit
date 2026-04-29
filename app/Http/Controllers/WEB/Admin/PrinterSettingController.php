@@ -27,6 +27,7 @@ class PrinterSettingController extends Controller
             'desk_printer'    => 'nullable|string|max:255',
             'print_mode'      => 'nullable|in:poll,push',
             'agent_port'      => 'nullable|integer|min:1024|max:65535',
+            'print_agent_key' => 'nullable|string|max:255',
         ]);
 
         $setting = Setting::first();
@@ -43,6 +44,11 @@ class PrinterSettingController extends Controller
         $setting->desk_printer    = $request->desk_printer;
         $setting->print_mode      = $request->input('print_mode', 'poll');
         $setting->agent_port      = (int) $request->input('agent_port', 5757);
+
+        if ($request->filled('print_agent_key')) {
+            $setting->print_agent_key = $request->print_agent_key;
+        }
+
         $setting->save();
 
         $notification = trans('admin_validation.Update Successfully');

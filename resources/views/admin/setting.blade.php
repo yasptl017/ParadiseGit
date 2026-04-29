@@ -926,11 +926,23 @@
             @method('PUT')
             <div class="form-group">
                 <label for="default_discount">{{ __('admin.Default Discount') }}</label>
-                <input type="text" class="form-control" id="default_discount" name="default_discount" value="{{ env('DEFAULTS_DISCOUNT') }}">
+                <input type="text" class="form-control" id="default_discount" name="default_discount" value="{{ $setting->default_discount ?? env('DEFAULTS_DISCOUNT') }}">
             </div>
             <div class="form-group">
                 <label for="free_delivery_threshold">{{ __('admin.Free Delivery') }}</label>
-                <input type="text" class="form-control" id="free_delivery_threshold" name="free_delivery_threshold" value="{{ env('DEFAULTS_DELIVERY') }}">
+                <input type="text" class="form-control" id="free_delivery_threshold" name="free_delivery_threshold" value="{{ $setting->default_delivery ?? env('DEFAULTS_DELIVERY') }}">
+            </div>
+            <div class="form-group">
+                <label for="maximum_distance">Maximum Delivery Distance</label>
+                <input type="text" class="form-control" id="maximum_distance" name="maximum_distance" value="{{ $setting->maximum_distance ?? env('MAXIMUM_DISTANCE') }}">
+            </div>
+            <div class="form-group">
+                <label for="minimum_order_amount">Minimum Order Amount</label>
+                <input type="text" class="form-control" id="minimum_order_amount" name="minimum_order_amount" value="{{ $setting->minimum_order_amount ?? env('MINIMUM_AMOUNT', 40) }}">
+            </div>
+            <div class="form-group">
+                <label for="order_delete_password">Order Delete Password</label>
+                <input type="password" class="form-control" id="order_delete_password" name="order_delete_password" placeholder="Leave blank to keep current password">
             </div>
             <button type="submit" class="btn btn-primary">{{ __('admin.Update') }}</button>
         </form>

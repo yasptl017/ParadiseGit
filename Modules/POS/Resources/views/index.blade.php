@@ -541,7 +541,7 @@ select {
                                         <i class="fas fa-tag text-warning mr-1"></i>{{__('admin.Discount')}} (%)
                                     </label>
                                     <input type="number" id="discount" class="form-control form-control-sm"
-                                           value="{{ env('DEFAULTS_DISCOUNT') }}" oninput="updateTotal()"
+                                           value="{{ App\Support\AppSettings::value('default_discount', env('DEFAULTS_DISCOUNT')) }}" oninput="updateTotal()"
                                            style="width:80px;border-radius:7px;border:2px solid #ced4da;">
                                 </div>
 

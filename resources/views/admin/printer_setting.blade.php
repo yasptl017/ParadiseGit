@@ -173,16 +173,27 @@
                                 zero delay. Select your preferred mode in the <em>Print Mode</em> card above.
                             </div>
 
-                            <h6 class="printer-step-title">Step 1 - Copy your API Key</h6>
-                            <div class="input-group mb-3 printer-key-group">
-                                <input type="text" class="form-control font-monospace"
-                                    id="apiKeyField"
-                                    value="{{ config('app.print_agent_key') }}"
-                                    readonly>
-                                <div class="input-group-append">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="copyKey()">Copy</button>
+                            <h6 class="printer-step-title">Step 1 - Set your API Key</h6>
+                            <form action="{{ route('admin.update-printer-setting') }}" method="POST" class="mb-3">
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="kitchen_printer" value="{{ optional($setting)->kitchen_printer }}">
+                                <input type="hidden" name="desk_printer" value="{{ optional($setting)->desk_printer }}">
+                                <input type="hidden" name="print_mode" value="{{ optional($setting)->print_mode ?? 'poll' }}">
+                                <input type="hidden" name="agent_port" value="{{ optional($setting)->agent_port ?? 5757 }}">
+
+                                <div class="input-group printer-key-group">
+                                    <input type="password" class="form-control font-monospace"
+                                        id="apiKeyField"
+                                        name="print_agent_key"
+                                        value="{{ old('print_agent_key', optional($setting)->print_agent_key ?: config('app.print_agent_key')) }}"
+                                        placeholder="Enter print agent API key">
+                                    <div class="input-group-append">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="copyKey()">Copy</button>
+                                        <button class="btn btn-primary" type="submit">Save Key</button>
+                                    </div>
                                 </div>
-                            </div>
+                            </form>
 
                             <h6 class="printer-step-title">Step 2 - Install the Print Agent on the restaurant PC</h6>
                             <ol class="small printer-step-list">
@@ -466,7 +477,7 @@ function onModeChange(radio) {
 }
 
 function loadJobs() {
-    fetch('{{ url("/api/print-agent/jobs") }}?key={{ env("PRINT_AGENT_KEY") }}')
+    fetch('{{ url("/api/print-agent/jobs") }}?key={{ urlencode(optional($setting)->print_agent_key ?: config("app.print_agent_key")) }}')
         .then(r => r.json())
         .then(jobs => {
             var tbody = document.getElementById('jobsBody');

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\PrintJob;
+use App\Support\AppSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -15,14 +16,20 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 // ─── Print Agent API ───────────────────────────────────────────────────────
-// All routes protected by a simple API key (set API_KEY in .env)
+// All routes protected by a simple API key.
 
-Route::middleware('api')->prefix('print-agent')->group(function () {
+$printAgentKeyIsInvalid = function (Request $request): bool {
+    $configuredKey = (string) AppSettings::value('print_agent_key', env('PRINT_AGENT_KEY', ''));
+
+    return $configuredKey === '' || !hash_equals($configuredKey, (string) $request->get('key', ''));
+};
+
+Route::middleware('api')->prefix('print-agent')->group(function () use ($printAgentKeyIsInvalid) {
 
     // GET /api/print-agent/jobs?key=XXX
     // Returns all pending print jobs (status=0)
     Route::get('/jobs', function (Request $request) {
-        if ($request->get('key') !== env('PRINT_AGENT_KEY')) {
+        if ($printAgentKeyIsInvalid($request)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
@@ -36,7 +43,7 @@ Route::middleware('api')->prefix('print-agent')->group(function () {
     // POST /api/print-agent/jobs/{id}/ack?key=XXX
     // Mark a job as printed (status=1) or failed (status=2)
     Route::post('/jobs/{id}/ack', function (Request $request, $id) {
-        if ($request->get('key') !== env('PRINT_AGENT_KEY')) {
+        if ($printAgentKeyIsInvalid($request)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
@@ -56,7 +63,7 @@ Route::middleware('api')->prefix('print-agent')->group(function () {
     // GET /api/print-agent/ping?key=XXX
     // Health check - lets the agent verify connection + credentials
     Route::get('/ping', function (Request $request) {
-        if ($request->get('key') !== env('PRINT_AGENT_KEY')) {
+        if ($printAgentKeyIsInvalid($request)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 

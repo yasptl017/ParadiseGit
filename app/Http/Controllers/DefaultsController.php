@@ -2,43 +2,40 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 
 class DefaultsController extends Controller
 {
     public function updateDefaults(Request $request)
     {
-        // Validate the input data if needed
         $request->validate([
             'default_discount' => 'required|numeric',
             'free_delivery_threshold' => 'required|numeric',
+            'maximum_distance' => 'nullable|numeric',
+            'minimum_order_amount' => 'required|numeric',
+            'order_delete_password' => 'nullable|string|max:255',
         ]);
 
-        // Read the .env file
-        $envPath = base_path('.env');
-        $envContent = File::get($envPath);
+        $setting = Setting::first();
 
-        // Update the default discount
-        $defaultDiscount = $request->input('default_discount');
-        $envContent = preg_replace(
-            '/^DEFAULTS_DISCOUNT=.*$/m',
-            'DEFAULTS_DISCOUNT=' . $defaultDiscount,
-            $envContent
-        );
+        if (!$setting) {
+            $notification = array('messege' => 'Settings row not found.', 'alert-type' => 'error');
 
-        // Update the free delivery threshold
-        $freeDeliveryThreshold = $request->input('free_delivery_threshold');
-        $envContent = preg_replace(
-            '/^DEFAULTS_DELIVERY=.*$/m',
-            'DEFAULTS_DELIVERY=' . $freeDeliveryThreshold,
-            $envContent
-        );
+            return redirect()->back()->with($notification);
+        }
 
-        // Save the updated .env file
-        File::put($envPath, $envContent);
+        $setting->default_discount = $request->input('default_discount');
+        $setting->default_delivery = $request->input('free_delivery_threshold');
+        $setting->maximum_distance = $request->input('maximum_distance', 0);
+        $setting->minimum_order_amount = $request->input('minimum_order_amount');
 
-        // Optionally, you can add a flash message or redirect the user
+        if ($request->filled('order_delete_password')) {
+            $setting->order_delete_password = $request->input('order_delete_password');
+        }
+
+        $setting->save();
+
         return redirect()->back()->with('success', 'Default values updated successfully.');
     }
 }

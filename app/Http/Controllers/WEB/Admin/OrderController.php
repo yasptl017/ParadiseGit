@@ -10,6 +10,7 @@ use App\Models\OrderProduct;
 use App\Models\Reservation;
 use App\Models\Setting;
 use App\Services\PrinterService;
+use App\Support\AppSettings;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Exception;
@@ -252,7 +253,7 @@ class OrderController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $configuredPassword = (string) config('app.order_delete_password', '');
+        $configuredPassword = (string) AppSettings::value('order_delete_password', config('app.order_delete_password', ''));
         $providedPassword = (string) $request->input('delete_password', '');
 
         if ($configuredPassword === '') {

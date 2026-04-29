@@ -207,7 +207,7 @@
 </div>
 
 @php
-    $minimum_order_amount = env('MINIMUM_AMOUNT', 40);
+    $minimum_order_amount = App\Support\AppSettings::value('minimum_order_amount', env('MINIMUM_AMOUNT', 40));
 @endphp
 
 @if($sub_total < $minimum_order_amount)
@@ -217,7 +217,7 @@
 @endif
 
 @php
-    $minimum_order_amount = env('MINIMUM_AMOUNT', 40);
+    $minimum_order_amount = App\Support\AppSettings::value('minimum_order_amount', env('MINIMUM_AMOUNT', 40));
     $is_below_minimum = $sub_total < $minimum_order_amount;
 @endphp
 
@@ -702,7 +702,7 @@
     e.preventDefault();
     
     var subTotal = parseFloat('{{ $sub_total }}');
-    var minimumAmount = parseFloat('{{ env('MINIMUM_AMOUNT', 40) }}');
+    var minimumAmount = parseFloat('{{ App\Support\AppSettings::value('minimum_order_amount', env('MINIMUM_AMOUNT', 40)) }}');
     
     if (subTotal < minimumAmount) {
         alert('Your order total is below the minimum order amount. Please add more items to your cart to proceed.');

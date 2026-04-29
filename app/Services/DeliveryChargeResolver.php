@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DeliveryArea;
 use App\Models\DeliveryPostcodeCharge;
+use App\Support\AppSettings;
 
 class DeliveryChargeResolver
 {
@@ -22,7 +23,7 @@ class DeliveryChargeResolver
     public function resolveWebsiteCharge(?string $postcode, ?float $distanceMeters, float $subTotal): array
     {
         $distanceKm = $this->distanceInKm($distanceMeters);
-        $maxDistance = (float) env('MAXIMUM_DISTANCE', 0);
+        $maxDistance = (float) AppSettings::value('maximum_distance', env('MAXIMUM_DISTANCE', 0));
 
         if ($distanceKm === null) {
             return [
@@ -61,7 +62,7 @@ class DeliveryChargeResolver
 
         return [
             'available' => true,
-            'charge' => (float) env('DEFAULTS_DELIVERY', 0),
+            'charge' => (float) AppSettings::value('default_delivery', env('DEFAULTS_DELIVERY', 0)),
             'source' => 'default',
         ];
     }
