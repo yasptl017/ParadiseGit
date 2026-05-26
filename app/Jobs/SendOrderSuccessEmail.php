@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Helpers\MailHelper;
 use App\Mail\WebsiteOrderReceipt;
 use App\Models\Order;
 use Illuminate\Bus\Queueable;
@@ -40,6 +41,8 @@ class SendOrderSuccessEmail implements ShouldQueue
         }
 
         try {
+            MailHelper::setMailConfig();
+
             $order = Order::with(['orderProducts', 'orderAddress'])->find($this->orderId);
             if (!$order) {
                 Log::warning('Receipt email skipped because order was not found', ['order_id' => $this->orderId]);

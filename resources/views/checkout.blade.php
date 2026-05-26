@@ -208,6 +208,7 @@
 
 @php
     $minimum_order_amount = App\Support\AppSettings::value('minimum_order_amount', env('MINIMUM_AMOUNT', 40));
+    $maximum_delivery_distance = App\Support\AppSettings::value('maximum_distance', env('MAXIMUM_DISTANCE', 0));
 @endphp
 
 @if($sub_total < $minimum_order_amount)
@@ -677,7 +678,8 @@
         // Function to check distance and show warning
         function checkDistanceAndWarn() {
             var distance = parseFloat($('#distance').val()) / 1000; // Convert to km
-            if (distance > 10) {
+            var maximumDistance = parseFloat('{{ $maximum_delivery_distance }}');
+            if (maximumDistance > 0 && distance > maximumDistance) {
                 $('#continue_to_pay').css('display', 'none');
                 $('#distance-warning').removeClass('d-none');
             } 

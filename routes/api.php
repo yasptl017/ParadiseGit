@@ -28,7 +28,7 @@ Route::middleware('api')->prefix('print-agent')->group(function () use ($printAg
 
     // GET /api/print-agent/jobs?key=XXX
     // Returns all pending print jobs (status=0)
-    Route::get('/jobs', function (Request $request) {
+    Route::get('/jobs', function (Request $request) use ($printAgentKeyIsInvalid) {
         if ($printAgentKeyIsInvalid($request)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -42,7 +42,7 @@ Route::middleware('api')->prefix('print-agent')->group(function () use ($printAg
 
     // POST /api/print-agent/jobs/{id}/ack?key=XXX
     // Mark a job as printed (status=1) or failed (status=2)
-    Route::post('/jobs/{id}/ack', function (Request $request, $id) {
+    Route::post('/jobs/{id}/ack', function (Request $request, $id) use ($printAgentKeyIsInvalid) {
         if ($printAgentKeyIsInvalid($request)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -62,7 +62,7 @@ Route::middleware('api')->prefix('print-agent')->group(function () use ($printAg
 
     // GET /api/print-agent/ping?key=XXX
     // Health check - lets the agent verify connection + credentials
-    Route::get('/ping', function (Request $request) {
+    Route::get('/ping', function (Request $request) use ($printAgentKeyIsInvalid) {
         if ($printAgentKeyIsInvalid($request)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }

@@ -227,6 +227,7 @@ class LoginController extends Controller
     public function google_callback()
     {
         try {
+            (new SocialLoginInformation())->setGoogleLoginInfo();
             $user = Socialite::driver('google')->user();
         } catch (\Exception $e) {
             return redirect()->route('login')->withErrors(['msg' => 'Google authentication failed. Please try again.']);
@@ -250,6 +251,7 @@ class LoginController extends Controller
     }
 
     public function facebook_callback(){
+        (new SocialLoginInformation())->setFacebookLoginInfo();
         $user = Socialite::driver('facebook')->user();
         $existUser = User::where('email', $user->email)->first();
         if($existUser) {
