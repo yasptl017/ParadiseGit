@@ -178,6 +178,5 @@
 
         }
       </script>
-      <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
       <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC2EqH1cqg0L0yTJ86hiGsr_ZAfEl1khss&libraries=places&callback=initAutocomplete" async defer></script>
 @endsection
