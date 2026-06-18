@@ -666,7 +666,7 @@ style='display: none'
         $output .= "     \n";
 
         if ($new_orders->count() > 0) {
-            $output .= "/n";
+            $output .= "\n";
             $output .= $stp;
             $output .= str_repeat("-", 42) . "\n";
             foreach ($new_orders as $item) {
@@ -687,6 +687,7 @@ style='display: none'
         //append current time
         $output .= "\n";
         $output .= date('d-m-Y H:i:s') . "\n";
+        $output .= str_repeat("\n", 3); // feed paper so date isn't cut off
         $this->printerService->sendToKitchen($output);
         $this->printerService->sendToDesk($output);
 
