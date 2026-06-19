@@ -545,11 +545,9 @@ style='display: none'
             // Save receipt to the order record
             \App\Models\Order::where('id', $order_result['id'])->update(['print_receipt' => $receipt]);
 
-            // Print to kitchen
-            $this->printerService->printToKitchen($order);
-
-            // Print to desk
-            $this->printerService->printToDesk($order);
+            // Print the same full receipt to both kitchen and desk printers
+            $this->printerService->sendToKitchen($receipt);
+            $this->printerService->sendToDesk($receipt);
 
             return response()->json(['message' => 'Order printed successfully']);
         } catch (Exception $e) {
