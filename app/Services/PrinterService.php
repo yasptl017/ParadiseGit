@@ -71,6 +71,7 @@ class PrinterService
 
     /**
      * Format order then queue for kitchen printer.
+     * Uses the same full format as the desk printer so both print identical details.
      */
     public function printToKitchen($order)
     {
@@ -81,7 +82,7 @@ class PrinterService
         $job = PrintJob::create([
             'order_id' => $order->id ?? null,
             'printer'  => $this->kitchenPrinter,
-            'content'  => $this->formatKitchenDetails($order),
+            'content'  => $this->formatOrderDetails($order),
             'status'   => PrintJob::STATUS_PENDING,
         ]);
 

@@ -225,11 +225,11 @@ def _load_logo_as_escpos(logo_path: str, max_width_px: int = 384) -> bytes:
 def _build_raw_payload(text, feed_lines=GENERIC_FEED_LINES, cut=False, role="generic", logo_path=""):
     """Build RAW payload for thermal printers (text + feed + optional cut).
 
-    For role='receipt': prepends logo (if configured) and processes ESC/POS
-    marker tags embedded in the text by PHP.
+    For role='receipt' or 'kitchen': prepends logo (if configured) and processes
+    ESC/POS marker tags embedded in the text by PHP.
     For all other roles: plain CP437 text, no marker processing.
     """
-    if role == "receipt":
+    if role in ("receipt", "kitchen"):
         logo_bytes = _load_logo_as_escpos(logo_path) if logo_path else b""
         payload = bytearray(logo_bytes) + bytearray(_process_markers(text or ""))
     else:
