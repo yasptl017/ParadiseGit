@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\MailHelper;
+use App\Models\Coupon;
 use App\Models\DeliveryArea;
 use App\Models\EmailTemplate;
 use App\Models\OrderControl;
@@ -62,12 +63,11 @@ class GuestPaymentController extends Controller
         ]);
     }
 
-    public function calculate_amount($address_id)
+    public function calculate_amount($address_id, $email = null, $phone = null)
     {
 
         $delivery_charge = Session::get('delivery_charge');
         $sub_total = 0;
-        $coupon_price = 0.00;
 
         $cart_contents = Cart::content();
         foreach ($cart_contents as $index => $cart_content) {
@@ -76,14 +76,14 @@ class GuestPaymentController extends Controller
             $sub_total += $item_total;
         }
 
-        if (Session::get('coupon_price') && Session::get('offer_type')) {
-            if (Session::get('offer_type') == 1) {
-                $coupon_price = Session::get('coupon_price');
-                $coupon_price = ($coupon_price / 100) * $sub_total;
-            } else {
-                $coupon_price = Session::get('coupon_price');
-            }
-        }
+        // Drop coupons no longer valid for this cart and auto-apply
+        // "default discount" offers. The customer's email/phone must be
+        // passed in once known (at payment) so a first time customer offer
+        // they have already earned is not discarded here.
+        Coupon::syncSession($sub_total, $email, $phone);
+        Coupon::syncGiftInCart($sub_total, Session::get('order_type'), $email, $phone, false);
+
+        $coupon_price = Coupon::sessionDiscount($sub_total);
 
         $grand_total = ($sub_total - $coupon_price) + $delivery_charge;
 
@@ -151,14 +151,25 @@ class GuestPaymentController extends Controller
             Session::put('delivery_distance', $request->input('distance'));
         }
  
+        // Final coupon check with the customer's real email/phone
+        // (first-time customer offers) before any money is taken.
+        $couponError = Coupon::validateSessionStrict($this->calculateCartSubtotal(), $userEmail, $userPhone);
+        if ($couponError) {
+            $notification = ['messege' => $couponError, 'alert-type' => 'error'];
+            return redirect()->back()->with($notification);
+        }
+        Coupon::syncGiftInCart($this->calculateCartSubtotal(), Session::get('order_type'), $userEmail, $userPhone, true);
+
         $cart_contents = Cart::content();
-        $calculate_amount = $this->calculate_amount(7);
+        $calculate_amount = $this->calculate_amount(7, $userEmail, $userPhone);
         $stripe = StripePayment::first();
         $payableAmount = round($calculate_amount['grand_total'] * $stripe->currency_rate, 2);
         Stripe\Stripe::setApiKey($stripe->stripe_secret);
 
+        // Charge exactly the discounted grand total. Round to whole cents:
+        // a bare float multiply can land on 2014.9999... and undercharge.
         $result = Stripe\Charge::create([
-            "amount" => $payableAmount * 100,
+            "amount" => (int) round($payableAmount * 100),
             "currency" => $stripe->currency_code,
             "source" => $request->stripeToken,
             "description" => env('APP_NAME')
@@ -261,13 +272,14 @@ class GuestPaymentController extends Controller
         $printerService->printToKitchen($details);
         $printerService->printToDesk($details);
 
+        Coupon::redeemByCode($order->coupon_name);
+
         Session::forget('order_type');
         Session::forget('delivery_id');
         Session::forget('delivery_charge');
         Session::forget('delivery_postal_code');
         Session::forget('delivery_distance');
-        Session::forget('coupon_price');
-        Session::forget('offer_type');
+        Coupon::forgetSession();
         Cart::destroy();
 
 

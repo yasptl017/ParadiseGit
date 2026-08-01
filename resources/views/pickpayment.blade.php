@@ -51,16 +51,9 @@
         @endphp
     @endforeach
 
-    @if (Session::get('coupon_price') && Session::get('offer_type'))
-        @php
-            if(Session::get('offer_type') == 1) {
-                $coupon_price = Session::get('coupon_price');
-                $coupon_price = ($coupon_price / 100) * $sub_total;
-            }else {
-                $coupon_price = Session::get('coupon_price');
-            }
-        @endphp
-    @endif
+    @php
+        $coupon_price = App\Models\Coupon::sessionDiscount($sub_total);
+    @endphp
 
     <!--============================
         PAYMENT PAGE START

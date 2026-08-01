@@ -6,6 +6,7 @@ namespace Modules\POS\Http\Controllers;
 use App\Helpers\MailHelper;
 use App\Models\Address;
 use App\Models\Category;
+use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\DeliveryArea;
 use App\Models\EmailTemplate;
@@ -224,12 +225,43 @@ class POSController extends Controller
         $new_cart = $active_table->cart;
         $new_cart[] = $data;
         $active_table->cart = $new_cart;
+        $this->resyncGift($active_table, $request->customer_id ?? null, $request->order_type ?? null);
         $active_table->save();
 
 
         return view('pos::ajax_cart')->with([
             'cart_contents' => $active_table->cart
         ]);
+    }
+
+    /**
+     * Recompute the POS cart subtotal (excluding any free-gift line) and
+     * add/refresh/remove the free-gift line for a "Buy & Get Free Product"
+     * offer. Saves the table's cart array but leaves persisting to the
+     * caller so it can be combined with other changes in one save().
+     */
+    protected function resyncGift(POSTable $active_table, $customerId = null, $orderType = null)
+    {
+        $cart_contents = $active_table->cart ?? [];
+
+        $sub_total = 0;
+        foreach ($cart_contents as $item) {
+            if (!empty($item['options']['is_gift'])) {
+                continue;
+            }
+            $sub_total += ($item['price'] * $item['qty']) + $item['options']['optional_item_price'];
+        }
+
+        $customer = $customerId ? Customer::find($customerId) : null;
+
+        $active_table->cart = Coupon::syncGiftInPosCartArray(
+            $cart_contents,
+            $sub_total,
+            $orderType,
+            $customer->email ?? null,
+            $customer->phone ?? null,
+            true
+        );
     }
 
     public function cart_quantity_update(Request $request)
@@ -241,6 +273,9 @@ class POSController extends Controller
         // Update the cart item quantity if it exists
         $cart_contents = collect($active_table->cart)->map(function ($item) use ($request) {
             if ($item['id'] == $request->rowid) {
+                if (!empty($item['options']['is_gift'])) {
+                    return $item; // the free gift's quantity is controlled by the offer
+                }
                 $item['qty'] = $request->quantity;
             }
             return $item;
@@ -248,6 +283,7 @@ class POSController extends Controller
 
         // Save the updated cart to the table
         $active_table->cart = $cart_contents->toArray();
+        $this->resyncGift($active_table, $request->customer_id ?? null, $request->order_type ?? null);
         $active_table->save();
 
         return view('pos::ajax_cart')->with([
@@ -260,11 +296,21 @@ class POSController extends Controller
 
         $active_table = POSTable::find(Session::get('active_table', POSTable::first()->id));
 
+        $target = collect($active_table->cart)->first(function ($item) use ($rowId) {
+            return $item['id'] == $rowId;
+        });
+
+        if ($target && !empty($target['options']['is_gift'])) {
+            // The free gift disappears on its own once the order no longer qualifies.
+            return view('pos::ajax_cart')->with(['cart_contents' => $active_table->cart]);
+        }
+
         $cart_contents = collect($active_table->cart)->filter(function ($item) use ($rowId) {
             return $item['id'] != $rowId;
         });
 
         $active_table->cart = $cart_contents->toArray();
+        $this->resyncGift($active_table);
         $active_table->save();
 
 
@@ -383,6 +429,67 @@ style='display: none'
 
     }
 
+    /**
+     * Validate a coupon code for the POS cart, or - when no code is given -
+     * look for an auto-apply "default discount" offer for the selected
+     * customer and order type.
+     */
+    public function apply_coupon(Request $request)
+    {
+        $sub_total = (float) $request->sub_total;
+        $orderType = $request->order_type;
+
+        $customer = $request->customer_id ? Customer::find($request->customer_id) : null;
+        $email = $customer->email ?? null;
+        $phone = $customer->phone ?? null;
+
+        // Keep the free-gift line item in sync with the current cart/customer/order type.
+        $active_table = POSTable::find(Session::get('active_table', optional(POSTable::first())->id));
+        $gift = null;
+        if ($active_table) {
+            $this->resyncGift($active_table, $request->customer_id, $orderType);
+            $active_table->save();
+            $gift = collect($active_table->cart)->first(function ($item) {
+                return !empty($item['options']['is_gift']);
+            });
+        }
+
+        if ($request->filled('coupon')) {
+            $coupon = Coupon::where(['code' => $request->coupon, 'status' => 1])->first();
+
+            if (!$coupon) {
+                return response()->json(['message' => trans('user_validation.Invalid Coupon')], 403);
+            }
+
+            $error = $coupon->validateFor($sub_total, $orderType, $email, $phone, true);
+            if ($error) {
+                return response()->json(['message' => $error], 403);
+            }
+
+            return response()->json([
+                'message' => trans('user_validation.Coupon applied successfully'),
+                'code' => $coupon->code,
+                'discount' => $coupon->discount,
+                'offer_type' => $coupon->offer_type,
+                'gift_product_name' => $gift['name'] ?? null,
+            ]);
+        }
+
+        $coupon = Coupon::findAutoApply($sub_total, $orderType, $email, $phone, true);
+
+        if (!$coupon) {
+            return response()->json(['code' => null, 'gift_product_name' => $gift['name'] ?? null]);
+        }
+
+        return response()->json([
+            'message' => 'Offer "' . $coupon->name . '" applied automatically',
+            'code' => $coupon->code,
+            'discount' => $coupon->discount,
+            'offer_type' => $coupon->offer_type,
+            'gift_product_name' => $gift['name'] ?? null,
+        ]);
+    }
+
     public function place_order(Request $request)
     {
         $active_table = POSTable::find(Session::get('active_table'));
@@ -410,7 +517,41 @@ style='display: none'
             $deliveryCharge = $resolvedDelivery['charge'];
         }
 
-        $calculate_amount = $this->calculate_amount($deliveryCharge, $request->coupon_price, $cart_contents);
+        // Final free-gift check with the real customer/order type, right
+        // before the order is stored - never trust the client's cart state
+        // for whether the gift is actually earned.
+        $this->resyncGift($active_table, $request->customer_id, $request->order_type);
+        $active_table->save();
+        $cart_contents = $active_table->cart;
+
+        // Server-side coupon handling: when a validated coupon code was
+        // applied in the UI, recompute the discount here instead of trusting
+        // the client's amount, and count the redemption.
+        $coupon_price = $request->coupon_price;
+        $coupon_name = null;
+        if ($request->filled('coupon_code')) {
+            // A coupon drove the client-side discount, so never trust the
+            // submitted amount: recompute it, or drop it when invalid.
+            $coupon_price = 0;
+
+            $sub_total = 0;
+            foreach ($cart_contents as $cart_content) {
+                if (!empty($cart_content['options']['is_gift'])) {
+                    continue;
+                }
+                $item_price = $cart_content['price'] * $cart_content['qty'];
+                $sub_total += $item_price + $cart_content['options']['optional_item_price'];
+            }
+
+            $coupon = Coupon::where(['code' => $request->coupon_code, 'status' => 1])->first();
+            if ($coupon && $coupon->validateFor($sub_total, $request->order_type, $user->email ?? null, $user->phone ?? null, true) === null) {
+                $coupon_price = $coupon->discountAmount($sub_total);
+                $coupon_name = $coupon->code;
+                Coupon::redeemByCode($coupon->code);
+            }
+        }
+
+        $calculate_amount = $this->calculate_amount($deliveryCharge, $coupon_price, $cart_contents);
 
         // Resolve payment method and status from request
         $rawMethod = $request->payment_method ?? 'card';
@@ -433,7 +574,7 @@ style='display: none'
         }
 
         $specialInstructions = $request->input('special_instructions', '');
-        $order_result = $this->orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $request->address_id, $request->order_type, $cart_contents, $specialInstructions);
+        $order_result = $this->orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $request->address_id, $request->order_type, $cart_contents, $specialInstructions, $coupon_name);
 
         //$this->sendOrderSuccessMail($user, $order_result, 'Cash on Delivery', 0);
         $customerDetails = $request->customerDetails ?? "Walking Customer";
@@ -469,7 +610,7 @@ style='display: none'
         );
     }
 
-    public function orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $address_id, $type, $cart_contents, $specialInstructions = '')
+    public function orderStore($user, $calculate_amount, $payment_method, $transaction_id, $payment_status, $cash_on_delivery, $address_id, $type, $cart_contents, $specialInstructions = '', $coupon_name = null)
     {
 
         $order = new Order();
@@ -488,6 +629,7 @@ style='display: none'
         $order->cash_on_delivery = $cash_on_delivery;
         $order->order_type = $type ?? 'Pickup';
         $order->special_instructions = $specialInstructions ?: null;
+        $order->coupon_name = $coupon_name;
         $order->save();
 
         foreach ($cart_contents as $index => $cart_content) {

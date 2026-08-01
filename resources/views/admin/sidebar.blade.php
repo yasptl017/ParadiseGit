@@ -80,17 +80,31 @@
             </ul>
           </li>
 
-          <li class="nav-item dropdown {{ Route::is('admin.coupon.*') || Route::is('admin.payment-method') || Route::is('admin.delivery-area.*') || Route::is('admin.delivery-postcode-charge.*') ? 'active' : '' }}">
+          <li class="nav-item dropdown {{ Route::is('admin.payment-method') || Route::is('admin.delivery-area.*') || Route::is('admin.delivery-postcode-charge.*') ? 'active' : '' }}">
             <a href="#" class="nav-link has-dropdown"><i class="fas fa-shopping-cart"></i><span>{{__('admin.Ecommerce')}}</span></a>
             <ul class="dropdown-menu">
-
-                <li class="{{ Route::is('admin.coupon.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.coupon.index') }}">{{__('admin.Coupon')}}</a></li>
 
                 <li class="{{ Route::is('admin.payment-method') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.payment-method') }}">{{__('admin.Payment Method')}}</a></li>
 
                 <li class="{{ Route::is('admin.delivery-area.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.delivery-area.index') }}">{{__('admin.Delivery Area')}}</a></li>
 
                 <li class="{{ Route::is('admin.delivery-postcode-charge.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.delivery-postcode-charge.index') }}">Delivery Postcode</a></li>
+
+            </ul>
+          </li>
+
+
+          <li class="nav-item dropdown {{ Route::is('admin.coupon.*') || Route::is('admin.first-time-users') || Route::is('admin.buy-get-discount') || Route::is('admin.buy-get-free-product') ? 'active' : '' }}">
+            <a href="#" class="nav-link has-dropdown"><i class="fas fa-percent"></i><span>Offers</span></a>
+            <ul class="dropdown-menu">
+
+                <li class="{{ Route::is('admin.coupon.*') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.coupon.index') }}">{{__('admin.Coupon')}}</a></li>
+
+                <li class="{{ Route::is('admin.first-time-users') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.first-time-users') }}">First Time Users</a></li>
+
+                <li class="{{ Route::is('admin.buy-get-discount') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.buy-get-discount') }}">Buy & Get Offer</a></li>
+
+                <li class="{{ Route::is('admin.buy-get-free-product') ? 'active' : '' }}"><a class="nav-link" href="{{ route('admin.buy-get-free-product') }}">Buy & Get Free Product</a></li>
 
             </ul>
           </li>

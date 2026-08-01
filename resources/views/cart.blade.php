@@ -278,13 +278,18 @@
                             <div class="cart-cards-wrapper">
                             @foreach ($cart_contents as $index => $cart_content)
                                 @php
+                                    $isGift = !empty($cart_content->options->is_gift);
                                     $item_price = $cart_content->price * $cart_content->qty;
                                     $item_total = $item_price + $cart_content->options->optional_item_price;
                                     $sub_total += $item_total;
                                 @endphp
-                                <div class="cart-item-card main-cart-item-{{ $cart_content->rowId }}">
+                                <div class="cart-item-card main-cart-item-{{ $cart_content->rowId }}" @if($isGift) style="background-color:#eafaf0;" @endif>
                                     <div class="cart-item-info">
-                                        <a class="cart-item-name" href="{{ route('show-product', $cart_content->options->slug) }}">{{ $cart_content->name }} <span class="product-price-inline">- {{ $currency_icon }}{{ number_format($cart_content->price, 2) }}</span></a>
+                                        <a class="cart-item-name" href="{{ route('show-product', $cart_content->options->slug) }}">
+                                            @if($isGift)
+                                                <span class="badge badge-success"><i class="fas fa-gift"></i> Free Gift</span>
+                                            @endif
+                                            {{ $cart_content->name }} <span class="product-price-inline">- {{ $currency_icon }}{{ number_format($cart_content->price, 2) }}</span></a>
                                         @if($cart_content->options->size)
                                             <span class="cart-item-size">{{ $cart_content->options->size }}</span>
                                         @endif
@@ -293,6 +298,11 @@
                                         @endforeach
                                     </div>
                                     <div class="cart-item-actions">
+                                        @if($isGift)
+                                            <div class="tf__pro_select quentity_btn">
+                                                <span>{{ $cart_content->qty }}</span>
+                                            </div>
+                                        @else
                                         <div class="tf__pro_select quentity_btn"
                                              data-item-price="{{ $cart_content->price }}"
                                              data-optional-price="{{ $cart_content->options->optional_item_price }}"
@@ -301,13 +311,16 @@
                                             <input class="quantity" type="text" readonly value="{{ $cart_content->qty }}">
                                             <button class="btn btn-success increament_product"><i class="fal fa-plus"></i></button>
                                         </div>
+                                        @endif
                                         <div class="tf__pro_tk cart-item-total">
                                             <h6>{{ $currency_icon }}{{ number_format($item_total, 2) }}</h6>
                                             <input type="hidden" class="product_total" value="{{ $item_total }}">
                                         </div>
+                                        @if(!$isGift)
                                         <div class="tf__pro_icon" data-remove-rowid="{{ $cart_content->rowId }}">
                                             <a class="remove_item" href="javascript:"><i class="far fa-times"></i></a>
                                         </div>
+                                        @endif
                                     </div>
                                 </div>
                             @endforeach
@@ -315,21 +328,20 @@
                         </div>
                     </div>
 
+                    @php
+                        $session_coupon = Session::get('coupon_name')
+                            ? App\Models\Coupon::where('code', Session::get('coupon_name'))->first()
+                            : null;
+                        $coupon_price = App\Models\Coupon::sessionDiscount($sub_total);
+                    @endphp
                     @if (Session::get('coupon_price') && Session::get('offer_type'))
                         <input type="hidden" id="couon_price" value="{{ Session::get('coupon_price') }}">
                         <input type="hidden" id="couon_offer_type" value="{{ Session::get('offer_type') }}">
-
-                        @php
-                             if(Session::get('offer_type') == 1) {
-                                $coupon_price = Session::get('coupon_price');
-                                $coupon_price = ($coupon_price / 100) * $sub_total;
-                            }else {
-                                $coupon_price = Session::get('coupon_price');
-                            }
-                        @endphp
+                        <input type="hidden" id="couon_max_discount" value="{{ optional($session_coupon)->max_discount ?: 0 }}">
                     @else
                         <input type="hidden" id="couon_price" value="0.00">
                         <input type="hidden" id="couon_offer_type" value="0">
+                        <input type="hidden" id="couon_max_discount" value="0">
                     @endif
 
                     <div class="col-lg-12 wow fadeInUp" data-wow-duration="1s">
@@ -633,20 +645,8 @@
             });
             $("#coupon_form").on("submit", function (e) {
     e.preventDefault();
-    
-    // Calculate current subtotal
-    let sub_total = 0;
-    $(".product_total").each(function () {
-        let current_val = parseFloat($(this).val());
-        sub_total += current_val;
-    });
-    
-    // Check minimum order requirement
-    if (sub_total < 50) {
-        toastr.error("Minimum order of $50 required to apply coupon");
-        return false;
-    }
-    
+
+    // Each coupon's minimum purchase is validated server-side.
     $.ajax({
         type: 'get',
         data: $('#coupon_form').serialize(),
@@ -768,6 +768,7 @@
     let sub_total = 0;
     let coupon_price = parseFloat($("#couon_price").val() || 0);
     let couon_offer_type = parseInt($("#couon_offer_type").val() || 0);
+    let couon_max_discount = parseFloat($("#couon_max_discount").val() || 0);
 
     let total_item = 0;
     $(".product_total").each(function () {
@@ -776,23 +777,16 @@
         total_item++;
     });
 
-    // Initialize coupon discount
+    // Each offer carries its own minimum spend, validated server-side.
     let apply_coupon_price = 0;
-    
-    // Only apply coupon if subtotal meets minimum requirement of 50
-    if (sub_total >= 50) {
-        if (couon_offer_type === 1) {
-            let percentage = coupon_price / 100;
-            apply_coupon_price = percentage * sub_total;
-        } else if (couon_offer_type === 2) {
-            apply_coupon_price = coupon_price;
+    if (couon_offer_type === 1) {
+        apply_coupon_price = (coupon_price / 100) * sub_total;
+        // Honour the offer's maximum discount cap, same as the server does.
+        if (couon_max_discount > 0 && apply_coupon_price > couon_max_discount) {
+            apply_coupon_price = couon_max_discount;
         }
-    } else {
-        // If subtotal is less than 50, remove any applied coupon
-        $("#couon_price").val(0);
-        $("#couon_offer_type").val(0);
-        // Optionally show a message to the user
-        toastr.warning("Minimum order of $50 required to apply coupon");
+    } else if (couon_offer_type === 2) {
+        apply_coupon_price = coupon_price;
     }
 
     let grand_total = sub_total - apply_coupon_price;

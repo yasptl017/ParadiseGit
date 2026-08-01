@@ -314,6 +314,8 @@ $products = Product::with('category')->where(['status' => 1])->whereIn('id', $cu
 
     public function offers(){
         $coupons = Coupon::where('status', 1)
+                        ->where('expired_date', '>=', date('Y-m-d'))
+                        ->whereColumn('apply_qty', '<', 'max_quantity')
                         ->orderBy('id', 'desc')
                         ->get();
         $setting = Setting::first();

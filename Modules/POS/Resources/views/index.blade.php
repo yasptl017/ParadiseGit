@@ -574,9 +574,14 @@ select {
                                             $coupon_price = 0.00;
                                         @endphp
                                         @foreach ($cart_contents as $cart_index => $cart_content)
-                                            <tr>
+                                            @php $isGift = !empty($cart_content['options']['is_gift']); @endphp
+                                            <tr @if($isGift) style="background-color:#eafaf0;" @endif>
                                                 <td class="pos-cart-item-cell">
-                                                    <p class="pos-cart-item-name">{{ $cart_content['name'] }}
+                                                    <p class="pos-cart-item-name">
+                                                        @if($isGift)
+                                                            <span class="badge badge-success"><i class="fas fa-gift"></i> Free</span>
+                                                        @endif
+                                                        {{ $cart_content['name'] }}
                                                         @if (!empty($cart_content['options']['size']) || strtolower($cart_content['options']['size']) !== 'regular')
                                                             ({{ $cart_content['options']['size'] }})
                                                         @endif
@@ -584,6 +589,9 @@ select {
 
                                                 </td>
                                                 <td data-rowid="{{ $cart_content['id'] }}">
+                                                    @if($isGift)
+                                                        <span class="text-center d-block">{{ $cart_content['qty'] }}</span>
+                                                    @else
                                                     <div class="input-group">
                                                         <div class="input-group-prepend">
                                                             <button class="btn btn-danger btn-sm qty-btn minus-btn">-
@@ -596,6 +604,7 @@ select {
                                                             </button>
                                                         </div>
                                                     </div>
+                                                    @endif
                                                 </td>
                                                 @php
                                                     $item_price = $cart_content['price'] * $cart_content['qty'];
@@ -604,9 +613,11 @@ select {
                                                 @endphp
                                                 <td>{{ $currency_icon }}{{ $item_total }}</td>
                                                 <td>
+                                                    @if(!$isGift)
                                                     <a href="javascript:"
                                                        onclick="removeCartItem('{{ $cart_content['id'] }}')"><i
                                                             class="fa fa-trash" aria-hidden="true"></i></a>
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -628,7 +639,7 @@ select {
                                     <input type="hidden" id="cart_sub_total" value="{{ $sub_total }}">
                                 </div>
                                 <br>
-                                <div id="order_count_display" style="display:none;">
+                                <div id="order_count_display">
                                     <form id="coupon_form">
                                         <div class="input-group w-50">
                                             <input name="coupon" type="text" placeholder="{{__('user.Coupon Code')}}"
@@ -636,6 +647,12 @@ select {
                                             <button type="submit" class="btn btn-success">{{__('user.apply')}}</button>
                                         </div>
                                     </form>
+                                    <div id="applied_coupon_wrap" style="display:none;margin-top:6px;">
+                                        <span class="badge badge-success" style="font-size:12px;">
+                                            <i class="fas fa-tag mr-1"></i>Coupon: <b id="applied_coupon_label"></b>
+                                        </span>
+                                        <a href="javascript:;" onclick="clearPosCoupon()" class="text-danger ml-1" title="Remove coupon"><i class="fas fa-times-circle"></i></a>
+                                    </div>
                                 </div>
                                 <br>
                                 <div>
@@ -669,6 +686,7 @@ select {
                                     <input type="hidden" name="customer_id" id="order_customer_id">
                                     <input type="hidden" name="address_id" id="order_address_id">
                                     <input type="hidden" value="0.00" name="coupon_price" id="coupon_price">
+                                    <input type="hidden" value="" name="coupon_code" id="coupon_code">
                                     <input type="hidden" value="0.00" name="delivery_fee" id="order_delivery_fee">
                                     <input type="hidden" value="{{ $sub_total }}" name="total_fee" id="order_total_fee">
                                     <input type="hidden" value="card" name="payment_method" id="order_payment_method">
@@ -891,35 +909,15 @@ select {
                 let posSearchDebounceTimer = null;
                 $("#coupon_form").on("submit", function (e) {
                     e.preventDefault();
-
-                    $.ajax({
-                        type: 'get',
-                        data: $('#coupon_form').serialize(),
-                        url: "{{ url('/apply-coupon') }}",
-                        success: function (response) {
-                            toastr.success(response.message)
-                            $("#coupon_form").trigger("reset");
-
-                            $("#couon_price").val(response.discount);
-                            $("#couon_offer_type").val(response.offer_type);
-
-                            calculateTotalFee();
-                        },
-                        error: function (response) {
-                            if (response.status == 422) {
-                                if (response.responseJSON.errors.coupon) toastr.error(response.responseJSON.errors.coupon[0])
-                            }
-
-                            if (response.status == 500) {
-                                toastr.error("{{__('user.Server error occured')}}")
-                            }
-
-                            if (response.status == 403) {
-                                toastr.error(response.responseJSON.message)
-                            }
-                        }
-                    });
+                    let code = $('#coupon_form input[name="coupon"]').val();
+                    if (!code) {
+                        toastr.error("{{__('user_validation.Coupon field is required')}}");
+                        return;
+                    }
+                    applyPosCoupon(code, false);
                 })
+                // Look for auto-apply offers for the walk-in state on load
+                checkAutoCoupon();
                 loadProudcts()
                 $(".pos_input_qty").on("change keyup", function (e) {
 
@@ -949,16 +947,9 @@ select {
                 });
 
                 function updateOrderCount() {
-                    var selectedIndex = this.selectedIndex;
-                    var selectedOption = this.options[selectedIndex];
-                    var orderCount = selectedOption.getAttribute('data-order-count');
-
-                    // Adding the form for coupon code
-                    if (orderCount > 0) {
-                        $("#order_count_display").show();
-                    } else {
-                        $("#order_count_display").hide();
-                    }
+                    // The coupon form is always available; first-time and
+                    // order-type rules are validated server-side.
+                    $("#order_count_display").show();
                 }
 
                 function
@@ -1213,6 +1204,7 @@ select {
             }
             // sync hidden select for Livewire
             $('#order_option').val(type).trigger('change');
+            checkAutoCoupon();
         }
 
         /* ── Payment Method ──────────────────────────── */
@@ -1320,6 +1312,7 @@ select {
             $('#customer-input').val(details);
             $('#customerInput').val(details);
             updateTotal();
+            checkAutoCoupon();
 
             $('#customerModal').modal('hide');
         }
@@ -1353,6 +1346,8 @@ select {
             $("#report_couon_price").html(`{{ $currency_icon }}${coupon_price}`);
             $("#report_total_fee").html(`{{ $currency_icon }}${order_total_fee}`);
             this.updateTotal();
+            // Cart contents changed - re-check coupon / auto-apply offers
+            checkAutoCoupon();
         }
 
         function loadProudcts() {
@@ -1400,6 +1395,97 @@ select {
             submitForm();
         }
 
+        /* ── Coupon / Offers ─────────────────────────── */
+        var posCoupon = null; // {code, discount, offer_type, auto}
+        var posGiftName = null;
+
+        function refreshGiftBanner(name) {
+            if (name && name !== posGiftName) {
+                toastr.success('Free gift added: ' + name);
+                // Reload the cart panel so the free-gift line appears.
+                $.ajax({ type: 'get', url: "{{ route('admin.load-cart') }}", success: function (r) { $('.shopping-card-body').html(r); bindQuantityButtons(); } });
+            } else if (!name && posGiftName) {
+                toastr.info('The free gift offer no longer applies.');
+                $.ajax({ type: 'get', url: "{{ route('admin.load-cart') }}", success: function (r) { $('.shopping-card-body').html(r); bindQuantityButtons(); } });
+            }
+            posGiftName = name || null;
+        }
+
+        function applyPosCoupon(code, silent) {
+            $.ajax({
+                type: 'get',
+                url: "{{ route('admin.pos-apply-coupon') }}",
+                data: {
+                    coupon: code || '',
+                    customer_id: $('#customer_id').val(),
+                    order_type: $('#order_option').val(),
+                    sub_total: $('#cart_sub_total').val()
+                },
+                success: function (response) {
+                    refreshGiftBanner(response.gift_product_name);
+
+                    if (!response.code) {
+                        // No auto-apply offer available for this context
+                        if (posCoupon && posCoupon.auto) clearPosCoupon();
+                        return;
+                    }
+                    posCoupon = {
+                        code: response.code,
+                        discount: parseFloat(response.discount),
+                        offer_type: parseInt(response.offer_type),
+                        auto: !code
+                    };
+                    $('#coupon_code').val(response.code);
+                    if (posCoupon.offer_type == 1) {
+                        $('#discount').val(response.discount);
+                    } else {
+                        $('#discount').val(0);
+                    }
+                    $('#applied_coupon_label').text(response.code);
+                    $('#applied_coupon_wrap').show();
+                    $('#coupon_form').trigger('reset');
+                    updateTotal();
+                    if (response.message) toastr.success(response.message);
+                },
+                error: function (response) {
+                    if (silent) {
+                        // Re-validation of the current coupon failed - remove it
+                        if (posCoupon) {
+                            if (response.responseJSON && response.responseJSON.message) {
+                                toastr.warning(response.responseJSON.message);
+                            }
+                            clearPosCoupon();
+                        }
+                        return;
+                    }
+                    if (response.status == 403 && response.responseJSON) {
+                        toastr.error(response.responseJSON.message);
+                    } else {
+                        toastr.error("{{__('user.Server error occured')}}");
+                    }
+                }
+            });
+        }
+
+        function clearPosCoupon() {
+            posCoupon = null;
+            $('#coupon_code').val('');
+            $('#discount').val(0);
+            $('#applied_coupon_wrap').hide();
+            updateTotal();
+        }
+
+        // Re-check offers whenever customer, order type or cart changes:
+        // re-validates a manually entered coupon, or looks for an
+        // auto-apply (default discount / first-time customer) offer.
+        function checkAutoCoupon() {
+            if (posCoupon && !posCoupon.auto) {
+                applyPosCoupon(posCoupon.code, true);
+            } else {
+                applyPosCoupon('', true);
+            }
+        }
+
         function updateTotal() {
             let customerInput = $('#customer-input').val();
             let subTotal = parseFloat($('#cart_sub_total').val());
@@ -1408,6 +1494,9 @@ select {
 
             // Calculate the actual discount amount
             let discountAmount = (discountPercentage / 100) * subTotal;
+            if (posCoupon && posCoupon.offer_type != 1) {
+                discountAmount += posCoupon.discount; // fixed amount coupon
+            }
 
             let total = subTotal - discountAmount + deliveryFee;
 

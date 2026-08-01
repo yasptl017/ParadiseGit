@@ -11,9 +11,13 @@
         $coupon_price = 0.00;
     @endphp
     @foreach ($cart_contents as $cart_index => $cart_content)
-        <tr>
+        @php $isGift = !empty($cart_content['options']['is_gift']); @endphp
+        <tr @if($isGift) style="background-color:#eafaf0;" @endif>
             <td class="pos-cart-item-cell">
                 <p class="pos-cart-item-name">
+                    @if($isGift)
+                        <span class="badge badge-success"><i class="fas fa-gift"></i> Free</span>
+                    @endif
                     {{ $cart_content['name'] }}
                     @if (!empty($cart_content['options']['size']) || strtolower($cart_content['options']['size']) !== 'regular')
                         ({{ $cart_content['options']['size'] }})
@@ -22,6 +26,9 @@
 
             </td>
             <td data-rowid="{{ $cart_content['id'] }}">
+                @if($isGift)
+                    <span class="text-center d-block">{{ $cart_content['qty'] }}</span>
+                @else
                 <div class="input-group">
                     <div class="input-group-prepend">
                         <button class="btn btn-danger btn-sm qty-btn minus-btn">-</button>
@@ -31,6 +38,7 @@
                         <button class="btn btn-primary btn-sm qty-btn plus-btn">+</button>
                     </div>
                 </div>
+                @endif
             </td>
             @php
                 $item_price = $cart_content['price'] * $cart_content['qty'];
@@ -39,8 +47,10 @@
             @endphp
             <td>{{ $currency_icon }}{{ $item_total }}</td>
             <td>
+                @if(!$isGift)
                 <a href="javascript:" onclick="removeCartItem('{{ $cart_content['id'] }}')"><i class="fa fa-trash"
                                                                                                aria-hidden="true"></i></a>
+                @endif
             </td>
         </tr>
     @endforeach

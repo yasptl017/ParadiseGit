@@ -161,21 +161,14 @@
         @endphp
     @endforeach
 
-    @if (Session::get('coupon_price') && Session::get('offer_type'))
-        @php
-            if(Session::get('offer_type') == 1) {
-                $coupon_price = Session::get('coupon_price');
-                $coupon_price = ($coupon_price / 100) * $sub_total;
-            } else {
-                $coupon_price = Session::get('coupon_price');
-            }
-        @endphp
-    @endif
+    @php
+        $coupon_price = App\Models\Coupon::sessionDiscount($sub_total);
+    @endphp
 
     <div id="sticky_sidebar" class="tf__cart_list_footer_button tf__cart_list_footer_button_text">
         <h6>{{__('user.total price')}}</h6>
         <p>{{__('user.subtotal')}}: <span>{{ $currency_icon }}{{ $sub_total }}</span></p>
-        <p>{{__('user.discount')}} (-): <span>{{ $currency_icon }}{{ $coupon_price }}</span></p>
+        <p>{{__('user.discount')}} (-): <span id="discount_display">{{ $currency_icon }}{{ number_format($coupon_price, 2) }}</span></p>
         <p>{{__('user.delivery')}} (+): <span class="delivery_charge">{{ $currency_icon }}0.00</span></p>
         <p class="total"><span>{{__('user.Total')}}:</span> <span class="grand_total">{{ $currency_icon }}{{ $sub_total - $coupon_price }}</span></p>
         <input type="hidden" id="grand_total" value="{{ $sub_total - $coupon_price }}">
@@ -266,12 +259,10 @@
                                     <span class="pay-summary-label">Subtotal</span>
                                     <span class="pay-summary-val">{{ $currency_icon }}{{ number_format($sub_total, 2) }}</span>
                                 </div>
-                                @if($coupon_price > 0)
-                                <div class="pay-summary-amounts pay-summary-discount">
+                                <div class="pay-summary-amounts pay-summary-discount" id="pay-discount-row" style="{{ $coupon_price > 0 ? '' : 'display:none;' }}">
                                     <span class="pay-summary-label"><i class="fas fa-tag"></i> Discount</span>
-                                    <span class="pay-summary-val">− {{ $currency_icon }}{{ number_format($coupon_price, 2) }}</span>
+                                    <span class="pay-summary-val" id="pay-discount-val">− {{ $currency_icon }}{{ number_format($coupon_price, 2) }}</span>
                                 </div>
-                                @endif
                                 <div class="pay-summary-amounts pay-summary-total" id="pay-modal-total-row">
                                     <span class="pay-summary-label">Total</span>
                                     <span class="pay-summary-val pay-grand-total" id="pay-modal-grand-total">
@@ -519,24 +510,34 @@
             .pay-btn-cancel:hover { background: #f5f5f5; border-color: #ccc; }
             .pay-btn-submit {
                 flex: 1;
-                padding: 12px 20px;
+                padding: 14px 20px;
                 border: none;
                 border-radius: 10px;
-                background: linear-gradient(135deg, #ff7c08, #e06c00);
-                color: #fff;
-                font-size: 15px;
-                font-weight: 700;
+                /* Darker orange so white text keeps a strong contrast ratio */
+                background: linear-gradient(135deg, #e06c00, #b85400);
+                color: #ffffff !important;
+                font-size: 16px;
+                font-weight: 800;
+                letter-spacing: .3px;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
                 transition: all .2s;
-                box-shadow: 0 4px 15px rgba(255,124,8,.35);
+                box-shadow: 0 4px 15px rgba(224,108,0,.35);
+            }
+            /* Force the label + icon white regardless of inherited theme colours */
+            .pay-btn-submit #pay-btn-label,
+            .pay-btn-submit span,
+            .pay-btn-submit i {
+                color: #ffffff !important;
+                font-weight: 800;
             }
             .pay-btn-submit:hover {
                 transform: translateY(-1px);
-                box-shadow: 0 6px 20px rgba(255,124,8,.45);
+                background: linear-gradient(135deg, #b85400, #9c4700);
+                box-shadow: 0 6px 20px rgba(224,108,0,.45);
             }
             .pay-secure-note {
                 text-align: center;
@@ -900,10 +901,74 @@
   textbox.addEventListener('input', handleTyping);
 </script>
 <script>
-    
+
 document.getElementById('payment-form').addEventListener('submit', function() {
     document.getElementById('loading-overlay').style.display = 'block';
 });
+</script>
+
+<script>
+    // Live offer check: first-time customer offers are only applied once the
+    // email/phone are known, and re-checked whenever those fields change.
+    (function ($) {
+        "use strict";
+
+        var offerRefreshTimer = null;
+        var lastOfferCode = {{ Js::from(Session::get('coupon_name')) }};
+
+        function currentDeliveryFee() {
+            var text = $('.delivery_charge').first().text() || '';
+            var fee = parseFloat(text.replace(/[^0-9.]/g, ''));
+            return isNaN(fee) ? 0 : fee;
+        }
+
+        function renderOfferAmounts(response) {
+            var discountText = '{{ $currency_icon }}' + response.coupon_price.toFixed(2);
+            var payableTotal = response.grand_total_base + currentDeliveryFee();
+            var totalText = '{{ $currency_icon }}' + payableTotal.toFixed(2);
+
+            $('#discount_display').text(discountText);
+            $('#grand_total').val(response.grand_total_base);
+            $('.grand_total').text(totalText);
+
+            if (response.coupon_price > 0) {
+                $('#pay-discount-row').show();
+                $('#pay-discount-val').text('− ' + discountText);
+            } else {
+                $('#pay-discount-row').hide();
+            }
+            $('#pay-modal-grand-total').text(totalText);
+            $('#pay-btn-label').text('Pay ' + totalText);
+
+            if (response.coupon_name && response.coupon_name !== lastOfferCode) {
+                toastr.success('Offer applied - discount ' + discountText);
+            } else if (!response.coupon_name && lastOfferCode) {
+                toastr.info('The offer is not available for these details.');
+            }
+            lastOfferCode = response.coupon_name;
+        }
+
+        function refreshOffer() {
+            $.ajax({
+                type: 'get',
+                url: "{{ route('refresh-offer') }}",
+                data: {
+                    email: $('#user_email').val(),
+                    phone: $('#user_phone').val()
+                },
+                success: renderOfferAmounts
+            });
+        }
+
+        $('#user_email, #user_phone').on('input change blur', function () {
+            clearTimeout(offerRefreshTimer);
+            offerRefreshTimer = setTimeout(refreshOffer, 500);
+        });
+
+        // Initial check on page load: clears any stale discount from a
+        // previous session and applies offers valid without identity.
+        $(document).ready(refreshOffer);
+    })(jQuery);
 </script>
 
 @endsection

@@ -15,6 +15,7 @@ Route::group(['as' => 'admin.', 'prefix' => 'admin'], function () {
         Route::get('pending-order-count', 'POSController@getPendingOrderCount')->name('pendingOrderCount');
         Route::post('/create-new-customer', 'POSController@create_new_customer')->name('create-new-customer');
         Route::post('/create-new-address', 'POSController@create_new_address')->name('create-new-address');
+        Route::get('/apply-coupon', 'POSController@apply_coupon')->name('pos-apply-coupon');
         Route::post('/place-order', 'POSController@place_order')->name('place-order');
         Route::post('/print-order', 'POSController@printOrder')->name('print.order');
         Route::get('/load-cart', 'POSController@load_cart')->name('load-cart');

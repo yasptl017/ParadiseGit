@@ -94,14 +94,10 @@ class PaypalController extends Controller
             $sub_total += $item_total;
         }
 
-        if(Session::get('coupon_price') && Session::get('offer_type')){
-            if(Session::get('offer_type') == 1) {
-                $coupon_price = Session::get('coupon_price');
-                $coupon_price = ($coupon_price / 100) * $sub_total;
-            }else {
-                $coupon_price = Session::get('coupon_price');
-            }
-        }
+        $user = Auth::guard('web')->user();
+        \App\Models\Coupon::syncGiftInCart($sub_total, Session::get('order_type'), $user->email ?? null, $user->phone ?? null, true);
+
+        $coupon_price = \App\Models\Coupon::sessionDiscount($sub_total);
 
         $grand_total = ($sub_total - $coupon_price) + $delivery_charge;
 

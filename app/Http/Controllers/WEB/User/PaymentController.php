@@ -9,6 +9,7 @@ use App\Library\SslCommerz\SslCommerzNotification;
 use App\Mail\OrderSuccessfully;
 use App\Models\Address;
 use App\Models\BankPayment;
+use App\Models\Coupon;
 use App\Models\DeliveryArea;
 use App\Models\EmailTemplate;
 use App\Models\ewayPayment;
@@ -94,12 +95,11 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function calculate_amount($address_id)
+    public function calculate_amount($address_id, $email = null, $phone = null)
     {
 
         $delivery_charge = Session::get('delivery_charge');
         $sub_total = 0;
-        $coupon_price = 0.00;
 
         $cart_contents = Cart::content();
         foreach ($cart_contents as $index => $cart_content) {
@@ -108,14 +108,17 @@ class PaymentController extends Controller
             $sub_total += $item_total;
         }
 
-        if (Session::get('coupon_price') && Session::get('offer_type')) {
-            if (Session::get('offer_type') == 1) {
-                $coupon_price = Session::get('coupon_price');
-                $coupon_price = ($coupon_price / 100) * $sub_total;
-            } else {
-                $coupon_price = Session::get('coupon_price');
-            }
-        }
+        // Drop coupons no longer valid for this cart (min purchase, order
+        // type, first-time customer) and auto-apply "default discount" offers.
+        // Prefer the email/phone entered on the checkout form, falling back to
+        // the account, so an earned first time offer is not discarded here.
+        $auth_user = Auth::guard('web')->user();
+        $email = $email ?: ($auth_user->email ?? null);
+        $phone = $phone ?: ($auth_user->phone ?? null);
+        Coupon::syncSession($sub_total, $email, $phone);
+        Coupon::syncGiftInCart($sub_total, Session::get('order_type'), $email, $phone, true);
+
+        $coupon_price = Coupon::sessionDiscount($sub_total);
 
         $grand_total = ($sub_total - $coupon_price) + $delivery_charge;
 
@@ -320,6 +323,7 @@ class PaymentController extends Controller
         $order->order_status = 0;
         $order->order_type = ($orderType == 1) ? 'Pickup' : 'Delivery';
         $order->cash_on_delivery = $cash_on_delivery;
+        $order->coupon_name = Session::get('coupon_name');
         $order->save();
 
         $cart_contents = Cart::content();
@@ -362,15 +366,14 @@ class PaymentController extends Controller
             $orderAddress->delivery_time = $find_delivery_address->min_time . ' - ' . $find_delivery_address->max_time;
             $orderAddress->save();
         }
+        Coupon::redeemByCode($order->coupon_name);
+
         Session::forget('order_type');
         Session::forget('delivery_id');
         Session::forget('delivery_charge');
         Session::forget('delivery_postal_code');
         Session::forget('delivery_distance');
-        Session::forget('coupon_price');
-        Session::forget('offer_type');
-        Session::forget('coupon_price');
-        Session::forget('offer_type');
+        Coupon::forgetSession();
         Cart::destroy();
 
         return $order;
@@ -458,13 +461,28 @@ class PaymentController extends Controller
 
         $cart_contents = Cart::content();
         $user = Auth::guard('web')->user();
-        $calculate_amount = $this->calculate_amount(7);
+        $calculate_amount = $this->calculate_amount(7, $userEmail, $userPhone);
+
+        // Final coupon check with the customer's real email/phone
+        // (first-time customer offers) before any money is taken.
+        $couponError = Coupon::validateSessionStrict(
+            $calculate_amount['sub_total'],
+            $userEmail ?: ($user->email ?? null),
+            $userPhone ?: ($user->phone ?? null)
+        );
+        if ($couponError) {
+            $notification = array('messege' => $couponError, 'alert-type' => 'error');
+            return redirect()->back()->with($notification);
+        }
+
         $stripe = StripePayment::first();
         $payableAmount = round($calculate_amount['grand_total'] * $stripe->currency_rate, 2);
         Stripe\Stripe::setApiKey($stripe->stripe_secret);
 
+        // Charge exactly the discounted grand total. Round to whole cents:
+        // a bare float multiply can land on 2014.9999... and undercharge.
         $result = Stripe\Charge::create([
-            "amount" => $payableAmount * 100,
+            "amount" => (int) round($payableAmount * 100),
             "currency" => $stripe->currency_code,
             "source" => $request->stripeToken,
             "description" => env('APP_NAME')
@@ -522,6 +540,7 @@ class PaymentController extends Controller
         $order->order_status = 0;
         $order->order_type = ($orderType == 1) ? 'Pickup' : 'Delivery';
         $order->cash_on_delivery = $cash_on_delivery;
+        $order->coupon_name = Session::get('coupon_name');
         $order->save();
 
         $cart_contents = Cart::content();
@@ -564,13 +583,14 @@ class PaymentController extends Controller
         $orderAddress->save();
         // }
 
+        Coupon::redeemByCode($order->coupon_name);
+
         Session::forget('order_type');
         Session::forget('delivery_id');
         Session::forget('delivery_charge');
         Session::forget('delivery_postal_code');
         Session::forget('delivery_distance');
-        Session::forget('coupon_price');
-        Session::forget('offer_type');
+        Coupon::forgetSession();
         Cart::destroy();
 
         return [
@@ -618,7 +638,7 @@ class PaymentController extends Controller
             'CancelUrl' => route('eway-failed'),
             'TransactionType' => TransactionType::PURCHASE,
             'Payment' => [
-                'TotalAmount' => $payableAmount * 100,
+                'TotalAmount' => (int) round($payableAmount * 100),
             ],
         ];
         $response = $client->createTransaction(ApiMethod::RESPONSIVE_SHARED, $transaction);

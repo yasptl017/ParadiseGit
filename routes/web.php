@@ -174,6 +174,7 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
         Route::get('load-cart-item', [CartController::class, 'load_cart_item'])->name('load-cart-item');
         Route::get('apply-coupon', [CartController::class, 'apply_coupon'])->name('apply-coupon');
         Route::get('apply-coupon-from-checkout', [CartController::class, 'apply_coupon_from_checkout'])->name('apply-coupon-from-checkout');
+        Route::get('refresh-offer', [CartController::class, 'refresh_offer'])->name('refresh-offer');
 
 
         Route::get('loc', [PaymentController::class, 'loc'])->name('loc');
@@ -414,6 +415,9 @@ Route::group(['middleware' => ['demo', 'XSS']], function () {
 
         Route::resource('coupon', CouponController::class);
         Route::put('coupon-status/{id}', [CouponController::class, 'changeStatus'])->name('coupon-status');
+        Route::get('first-time-users', [CouponController::class, 'firstTimeUsers'])->name('first-time-users');
+        Route::get('buy-get-discount', [CouponController::class, 'buyGetDiscount'])->name('buy-get-discount');
+        Route::get('buy-get-free-product', [CouponController::class, 'buyGetFreeProduct'])->name('buy-get-free-product');
 
         Route::resource('footer', FooterController::class);
         Route::resource('social-link', FooterSocialLinkController::class);

@@ -135,6 +135,31 @@
     .coupon .details strong {
         color: var(--primary-color);
     }
+    .coupon .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 15px;
+    }
+    .coupon .tag-row .badge {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 20px;
+        background-color: #f1f3f5;
+        color: var(--secondary-color);
+    }
+    .coupon .tag-row .badge.auto {
+        background-color: #2ecc71;
+        color: #fff;
+    }
+    .coupon .no-offers {
+        text-align: center;
+        color: var(--secondary-color);
+        font-size: 16px;
+        padding: 30px 0;
+    }
 
     @media (max-width: 768px) {
         .tf__section_heading h2 {
@@ -185,52 +210,70 @@
             <div class="col-xl-6 col-lg-8">
                 <div class="tf__section_heading mb_25">
                     <h4>Special Offers</h4>
-                    <h2>Stay connected for more exciting deals soon!<h2>
-                       
+                    @if($coupons->count() > 0)
+                        <h2>Grab a deal before it's gone!</h2>
+                    @else
+                        <h2>Stay connected for more exciting deals soon!</h2>
+                    @endif
                 </div>
             </div>
         </div>
-        <!--
-        <div class="row justify-content-center">
-            <div class="col-lg-8 col-md-10">
-                <div class="tf__offer_image">
-                    <img src="{{ asset('user/images/offer.jpg') }}" alt="Special Offers" class="img-fluid">
-                </div>
-            </div>
-        </div>
-        -->
     </div>
 </section>
 <!--=============================
     OFFER ITEM START
 ==============================-->
-<!--
-<section class="tf__offer_item pt_95 pb_100 xs_pt_65 xs_pb_70 mt_130 mb_60">
+@if($coupons->count() > 0)
+<section class="tf__offer_item pt_30 pb_100 xs_pt_20 xs_pb_70 mb_60">
     <div class="container">
-        <div class="row wow fadeInUp" data-wow-duration="1s">
-            <div class="col-md-8 col-lg-7 col-xl-6">
-                <div class="tf__section_heading mb_25">
-                    <h4 class="text-uppercase text-primary">{{__('user.daily offer')}}</h4>
-                    <h2 class="display-4 fw-bold">{{__('user.up to 15% off on all orders')}}</h2>
-                </div>
-            </div>
-        </div>
         <div class="coupon-container wow fadeInUp" data-wow-duration="1s">
             @foreach ($coupons as $coupon)
             <div class="coupon">
-                <div class="discount-badge">{{ $coupon->discount }}% {{__('user.off')}}</div>
+                <div class="discount-badge">
+                    @if($coupon->isBuyGetFreeProduct())
+                        <i class="fas fa-gift"></i> {{__('user.free')}}
+                    @elseif($coupon->offer_type == 1)
+                        {{ $coupon->discount }}% {{__('user.off')}}
+                    @else
+                        {{ $setting->currency_icon }}{{ number_format($coupon->discount, 2) }} {{__('user.off')}}
+                    @endif
+                </div>
                 <h3>{{ $coupon->name }}</h3>
-                <p class="code">{{ $coupon->code }}</p>
+
+                @if($coupon->auto_apply)
+                    <p class="code" style="border-style:solid;">Auto Applied</p>
+                @else
+                    <p class="code">{{ $coupon->code }}</p>
+                @endif
+
                 <div class="details">
-                    <p><strong>Valid until:</strong> {{ $coupon->expired_date }}</p>
-                    <p><strong>Minimum Purchase:</strong> ${{ number_format($coupon->min_purchase_price, 2) }}</p>
+                    @if($coupon->isBuyGetFreeProduct() && $coupon->giftProduct)
+                        <p><strong>You get:</strong> {{ $coupon->gift_qty > 1 ? $coupon->gift_qty . ' x ' : '' }}{{ $coupon->giftProduct->name }} free</p>
+                    @endif
+                    @if($coupon->maxDiscountLabel($setting->currency_icon))
+                        <p><strong>{{ $coupon->maxDiscountLabel($setting->currency_icon) }}</strong></p>
+                    @endif
+                    <p><strong>Valid until:</strong> {{ date('d M, Y', strtotime($coupon->expired_date)) }}</p>
+                    @if($coupon->min_purchase_price > 0)
+                        <p><strong>{{ $coupon->isBuyGetFreeProduct() || $coupon->isBuyGetDiscount() ? 'Spend' : 'Minimum Purchase' }}:</strong> {{ $setting->currency_icon }}{{ number_format($coupon->min_purchase_price, 2) }}+</p>
+                    @endif
+                </div>
+
+                <div class="tag-row">
+                    @if($coupon->auto_apply)
+                        <span class="badge auto"><i class="fas fa-bolt"></i> Auto Applied</span>
+                    @endif
+                    @if(($coupon->first_time_basis ?? 'none') !== 'none')
+                        <span class="badge"><i class="fas fa-star"></i> {{ $coupon->firstTimeLabel() }}</span>
+                    @endif
+                    <span class="badge"><i class="fas fa-utensils"></i> {{ $coupon->orderTypeLabels() }}</span>
                 </div>
             </div>
             @endforeach
         </div>
     </div>
 </section>
--->
+@endif
 
 <!--=============================
     OFFER ITEM END
